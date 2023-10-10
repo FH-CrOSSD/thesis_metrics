@@ -180,7 +180,7 @@ class DataMinePipeline(base.Request):
                            data_path=self.output_path,
                            feature=self.language + "_stale_branches")
 
-        time.sleep(300)
+        # time.sleep(300)
 
         # Active branches
         active_branches = self.get_branches(activity="active")
@@ -337,7 +337,7 @@ class DataMinePipeline(base.Request):
                     repeat = False
                     self.logger.info("Finished function %s successfully",
                                      data_query.__name__)
-                    time.sleep(240)
+                    # time.sleep(240)
                 except Exception as error:
                     self.logger.error(
                         "Error at function %s:%s",
@@ -401,11 +401,14 @@ def main():
     """
     start_date = date.today()
     languages = ["php", "cpp", "python", "JavaScript", "java"]
-    read_repository_json = True
+    # read_repository_json = True
+    read_repository_json = False
     curr_path = Path(os.path.dirname(__file__))
+    # csv_path = os.path.join(curr_path.parents[0],
+    #                         "inputs/small_sample.csv", )
     csv_path = os.path.join(curr_path.parents[0],
-                            "inputs/small_sample.csv", )
-    csv_path = ""
+                            "outputs/data/single.csv", )
+    # csv_path = ""
     run_pipeline(start_date=start_date, languages=languages,
                  get_existing_repos=read_repository_json,
                  read_csv=csv_path)

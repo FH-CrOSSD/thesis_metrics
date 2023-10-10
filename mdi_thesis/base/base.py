@@ -297,7 +297,8 @@ class Request:
             if "organization_users" in queried_features:
                 time.sleep(1)
             else:
-                time.sleep(60)
+                # time.sleep(60)
+                pass
             param_list = self.get_repository_data(
                 feature_list=query[0],
                 request_url_1=query[1],
