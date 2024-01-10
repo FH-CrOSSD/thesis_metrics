@@ -15,11 +15,13 @@ import numpy as np
 import regex as re
 import mdi_thesis.base.utils as utils
 import mdi_thesis.external as external
+from pathlib import Path
+import os.path
 
 
-def maturity_level(base_data:
-                   Dict, filter_date: date,
-                   log: logging.Logger) -> Dict[int, int]:
+def maturity_level(
+    base_data: Dict, filter_date: date, log: logging.Logger
+) -> Dict[int, int]:
     """
     :param data_object: Request object, required to gather data
     of already selected repositories.
@@ -36,8 +38,7 @@ def maturity_level(base_data:
         log.info("Data available. Starting calculation...")
         for repo, data in repository_data.items():
             created_at = data.get("created_at")
-            created_at = datetime.strptime(
-                created_at, '%Y-%m-%dT%H:%M:%SZ').date()
+            created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ").date()
             dates = relativedelta.relativedelta(filter_date, created_at)
             years = dates.years
             months = dates.months
@@ -57,7 +58,7 @@ def maturity_level(base_data:
             # Age < 2 months
             elif years == 0 and months < 2:
                 score = 1
-            score = score/5
+            score = score / 5
             age_score[repo] = score
 
         score = 0
@@ -73,7 +74,7 @@ def maturity_level(base_data:
                 score = 4
             elif nr_of_issues <= 50:
                 score = 5
-            score = score/5
+            score = score / 5
             issue_score[repo] = score
 
         for repo, releases in release_data.items():
@@ -84,18 +85,17 @@ def maturity_level(base_data:
                     score = 5
             else:
                 score = 1
-            score = score/5
+            score = score / 5
             release_score[repo] = score
         if age_score:
             for repo, score in age_score.items():
                 score_sum = score + issue_score[repo] + release_score[repo]
-                result = score_sum/3 * 100
+                result = score_sum / 3 * 100
                 repo_metric_dict[repo] = result
     return repo_metric_dict
 
 
-def osi_approved_license(base_data: Dict,
-                         log: logging.Logger) -> Dict[int, bool]:
+def osi_approved_license(base_data: Dict, log: logging.Logger) -> Dict[int, bool]:
     """
     Checks if a repos license is osi approved.
     :param data_object: Request object, required to gather data
@@ -131,8 +131,9 @@ def osi_approved_license(base_data: Dict,
     return results
 
 
-def technical_fork(base_data: Dict,
-                   log: logging.Logger) -> Dict[int, Dict[str, Union[int, float]]]:
+def technical_fork(
+    base_data: Dict, log: logging.Logger
+) -> Dict[int, Dict[str, Union[int, float]]]:
     """
     Total number of forks and average creation time.
     :param data_object: Request object, required to gather data
@@ -152,8 +153,7 @@ def technical_fork(base_data: Dict,
                 created_at_times = []
                 for fork in data:
                     fork_created_at = fork.get("created_at")
-                    fork_date = datetime.strptime(
-                        fork_created_at, '%Y-%m-%dT%H:%M:%SZ')
+                    fork_date = datetime.strptime(fork_created_at, "%Y-%m-%dT%H:%M:%SZ")
                     created_at_times.append(fork_date)
                     fork_id = fork.get("id")
                     if fork_id:
@@ -168,20 +168,21 @@ def technical_fork(base_data: Dict,
                     # Count the number of elements per week
                     elements_per_week = [0] * num_weeks
                     for fork_datetime in created_at_times:
-                        week_index = (fork_datetime.date() -
-                                      earliest_date).days // 7
+                        week_index = (fork_datetime.date() - earliest_date).days // 7
                         elements_per_week[week_index] += 1
                     average_per_week = round(np.mean(elements_per_week))
-            fork_results[repo] = {"total_forks":
-                                  fork_nr,
-                                  "average_forks_created_per_week":
-                                  average_per_week}
+            fork_results[repo] = {
+                "total_forks": fork_nr,
+                "average_forks_created_per_week": average_per_week,
+            }
     else:
         log.info("No data available. Returning %s", fork_results)
     return fork_results
 
 
-def criticality_score(base_data: Dict, filter_date: date, log: logging.Logger) -> Dict[int, float]:
+def criticality_score(
+    base_data: Dict, filter_date: date, log: logging.Logger
+) -> Dict[int, float]:
     """
     :param data_object: Request object, required to gather data
     of already selected repositories.
@@ -198,25 +199,36 @@ def criticality_score(base_data: Dict, filter_date: date, log: logging.Logger) -
     issue_comments = base_data.get("issue_comments")
     dependents = base_data.get("downstream_dependencies")
     repo_organizations = base_data.get("organizations")
-    if repository_data and contributor_data and commit_data and release_data \
-            and issues_data and issue_comments and dependents and repo_organizations:
+    if (
+        repository_data
+        and contributor_data
+        and commit_data
+        and release_data
+        and issues_data
+        and issue_comments
+        and dependents
+        and repo_organizations
+    ):
         log.info("Data available. Starting calculation...")
         for repo, data in repository_data.items():
             created_at = data.get("created_at")
-            created_at = datetime.strptime(created_at, '%Y-%m-%dT%H:%M:%SZ')
+            created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
             updated_at = data.get("updated_at")
-            updated_at = datetime.strptime(updated_at, '%Y-%m-%dT%H:%M:%SZ')
+            updated_at = datetime.strptime(updated_at, "%Y-%m-%dT%H:%M:%SZ")
             dates = relativedelta.relativedelta(filter_date, created_at)
-            months = dates.months + (dates.years*12)
-            diff_updated_today = relativedelta.relativedelta(
-                filter_date, updated_at)
+            months = dates.months + (dates.years * 12)
+            diff_updated_today = relativedelta.relativedelta(filter_date, updated_at)
             diff_updated_today = diff_updated_today.months + (
-                diff_updated_today.years*12)
-            scores_per_repo[repo] = {"created_since": months,
-                                     "updated_since": diff_updated_today}
+                diff_updated_today.years * 12
+            )
+            scores_per_repo[repo] = {
+                "created_since": months,
+                "updated_since": diff_updated_today,
+            }
             # contributor_count
             contributor_count = utils.get_contributors(
-                contributors_data=contributor_data, check_contrib=True)
+                contributors_data=contributor_data, check_contrib=True
+            )
             cont_count = contributor_count.get(repo)
             if cont_count:
                 scores_per_repo[repo].update({"contributor_count": cont_count})
@@ -234,10 +246,10 @@ def criticality_score(base_data: Dict, filter_date: date, log: logging.Logger) -
             if commits:
                 for commit in commits:
                     try:
-                        commit_date = commit.get(
-                            "commit").get("author").get("date")
+                        commit_date = commit.get("commit").get("author").get("date")
                         commit_date = datetime.strptime(
-                            commit_date, '%Y-%m-%dT%H:%M:%SZ')
+                            commit_date, "%Y-%m-%dT%H:%M:%SZ"
+                        )
                         repo_commit_dates.append(commit_date)
                     except KeyError:
                         continue
@@ -250,20 +262,17 @@ def criticality_score(base_data: Dict, filter_date: date, log: logging.Logger) -
                     # Count the number of elements per week
                     elements_per_week = [0] * num_weeks
                     for commit_datetime in repo_commit_dates:
-                        week_index = (
-                            commit_datetime.date() - earliest_date).days // 7
+                        week_index = (commit_datetime.date() - earliest_date).days // 7
                         elements_per_week[week_index] += 1
                     average_per_week = np.mean(elements_per_week)
-            scores_per_repo[repo].update(
-                {"commit_frequency": average_per_week})
+            scores_per_repo[repo].update({"commit_frequency": average_per_week})
             # recent_releases_count
             releases = release_data.get(repo)
             if releases:
                 num_releases = len(releases)
             else:
                 num_releases = 0
-            scores_per_repo[repo].update(
-                {"recent_releases_count": num_releases})
+            scores_per_repo[repo].update({"recent_releases_count": num_releases})
             # closed_issues_count & updated_issues_count
             issues_list = issues_data.get(repo)
             closed_issues = 0
@@ -274,21 +283,24 @@ def criticality_score(base_data: Dict, filter_date: date, log: logging.Logger) -
                     updated_at = issue.get("updated_at")
                     if closed_at:
                         closed_date = datetime.strptime(
-                            closed_at,
-                            '%Y-%m-%dT%H:%M:%SZ').date()
+                            closed_at, "%Y-%m-%dT%H:%M:%SZ"
+                        ).date()
                         closed_diff = filter_date - closed_date
                         if closed_diff.days <= 90:
                             closed_issues += 1
                     if updated_at:
                         updated_date = datetime.strptime(
-                            updated_at,
-                            '%Y-%m-%dT%H:%M:%SZ').date()
+                            updated_at, "%Y-%m-%dT%H:%M:%SZ"
+                        ).date()
                         updated_diff = filter_date - updated_date
                         if updated_diff.days <= 90:
                             updated_issues += 1
             scores_per_repo[repo].update(
-                {"closed_issues_count": closed_issues,
-                 "updated_issues_count": updated_issues})
+                {
+                    "closed_issues_count": closed_issues,
+                    "updated_issues_count": updated_issues,
+                }
+            )
             # comment_frequency
             issues_dict = issue_comments.get(repo)
             avg_comment_count = 0
@@ -300,33 +312,35 @@ def criticality_score(base_data: Dict, filter_date: date, log: logging.Logger) -
                         if comment.get("id"):
                             comment_updated_at = comment.get("updated_at")
                             comment_updated_at = datetime.strptime(
-                                comment_updated_at,
-                                '%Y-%m-%dT%H:%M:%SZ').date()
+                                comment_updated_at, "%Y-%m-%dT%H:%M:%SZ"
+                            ).date()
                             if comment_updated_at > filter_date:
                                 comment_len += 1
                     comment_count_list.append(comment_len)
                 if comment_count_list:
                     avg_comment_count = np.mean(comment_count_list)
-            scores_per_repo[repo].update(
-                {"comment_frequency": avg_comment_count})
+            scores_per_repo[repo].update({"comment_frequency": avg_comment_count})
             # dependents_count
             downstream_dep = dependents.get(repo)
             dep_count = 0
             if downstream_dep:
                 dep_count = downstream_dep.get("total_dependents")
-            scores_per_repo[repo].update(
-                {"dependents_count": dep_count})
+            scores_per_repo[repo].update({"dependents_count": dep_count})
 
-    weights_json = open(
-        r"mdi_thesis\criticality_score_weights.json",
-        encoding="utf-8")
+    source_path = Path(__file__).resolve()
+    source_dir = source_path.parent
+
+    weights_json = open(os.path.join(source_dir,"criticality_score_weights.json"), encoding="utf-8")
+    # weights_json = open(
+    #     r"mdi_thesis\criticality_score_weights.json",
+    #     encoding="utf-8")
     weights = json.load(weights_json)
     weight_sum = 0
     for elements in weights.values():
         weight = elements.get("weight")
         weight_sum += weight
     for repo, param in scores_per_repo.items():
-        form_1 = 1/weight_sum
+        form_1 = 1 / weight_sum
         sum_alpha = 0
         for param_name, value in param.items():
             log_1 = np.log(1 + value)
@@ -335,11 +349,11 @@ def criticality_score(base_data: Dict, filter_date: date, log: logging.Logger) -
             if log_2 == 0:
                 res_fraction = 1
             else:
-                res_fraction = log_1/log_2
+                res_fraction = log_1 / log_2
             weight = weights.get(param_name).get("weight")
-            res_1 = weight*res_fraction
+            res_1 = weight * res_fraction
             sum_alpha += res_1
-        res_2 = round((form_1*sum_alpha), 2) * 100
+        res_2 = round((form_1 * sum_alpha), 2) * 100
         criticality_score_per_repo[repo] = res_2
 
     return criticality_score_per_repo
@@ -377,14 +391,11 @@ def pull_requests(base_data: Dict, log: logging.Logger) -> Dict[int, Dict[str, f
                     closed_at = pull.get("closed_at")
                     created_at = pull.get("created_at")
                     merged_at = pull.get("merged_at")
-                    created_at = datetime.strptime(
-                        created_at, '%Y-%m-%dT%H:%M:%SZ')
+                    created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
                     if closed_at:
-                        closed_at = datetime.strptime(
-                            closed_at, '%Y-%m-%dT%H:%M:%SZ')
+                        closed_at = datetime.strptime(closed_at, "%Y-%m-%dT%H:%M:%SZ")
                     if merged_at:
-                        merged_at = datetime.strptime(
-                            merged_at, '%Y-%m-%dT%H:%M:%SZ')
+                        merged_at = datetime.strptime(merged_at, "%Y-%m-%dT%H:%M:%SZ")
                         pulls_merged += 1
                         if closed_at:
                             if closed_at == merged_at:
@@ -395,24 +406,27 @@ def pull_requests(base_data: Dict, log: logging.Logger) -> Dict[int, Dict[str, f
                     elif state == "closed":
                         state_closed += 1
                 if len(date_diffs) > 0:
-                    avg_date_diff = (np.mean(date_diffs))
+                    avg_date_diff = np.mean(date_diffs)
 
                 if total_pulls > 0:
                     ratio_open = (state_open / total_pulls) * 100
                     ratio_closed = (state_closed / total_pulls) * 100
                     ratio_merged = (pulls_merged / total_pulls) * 100
-            pull_results[repo] = {"total_pulls": total_pulls,
-                                  "avg_pull_closing_days": avg_date_diff,
-                                  "ratio_open_total": ratio_open,
-                                  "ratio_closed_total": ratio_closed,
-                                  "ratio_merged_total": ratio_merged}
+            pull_results[repo] = {
+                "total_pulls": total_pulls,
+                "avg_pull_closing_days": avg_date_diff,
+                "ratio_open_total": ratio_open,
+                "ratio_closed_total": ratio_closed,
+                "ratio_merged_total": ratio_merged,
+            }
     else:
         log.info("No data available. Returning %s", pull_results)
     return pull_results
 
 
-def project_velocity(base_data: Dict,
-                     log: logging.Logger) -> Dict[int, Dict[str, float]]:
+def project_velocity(
+    base_data: Dict, log: logging.Logger
+) -> Dict[int, Dict[str, float]]:
     """
     Calculates information about a projects velocity concerning
     issues and their resolving time. Issues also include pulls,
@@ -449,8 +463,7 @@ def project_velocity(base_data: Dict,
                     pull_issue_list.append(is_pull_request)
                     state = issue.get("state")
                     created_at = issue.get("created_at")
-                    created_at = datetime.strptime(
-                        created_at, '%Y-%m-%dT%H:%M:%SZ')
+                    created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
                     if state == "open":
                         open_issues += 1
                     elif state == "closed":
@@ -458,7 +471,8 @@ def project_velocity(base_data: Dict,
                         closed_at = issue.get("closed_at")
                         if closed_at:
                             closed_at = datetime.strptime(
-                                closed_at, '%Y-%m-%dT%H:%M:%SZ')
+                                closed_at, "%Y-%m-%dT%H:%M:%SZ"
+                            )
                         date_diff = closed_at - created_at
                         date_diffs.append(date_diff.days)
                 pull_count = pull_issue_list.count(True)
@@ -478,15 +492,16 @@ def project_velocity(base_data: Dict,
                 "ratio_pull_issue": ratio_pull_issue,
                 "avg_issue_resolving_days": avg_date_diff,
                 "ratio_open_total": ratio_open,
-                "ratio_closed_total": ratio_closed}
+                "ratio_closed_total": ratio_closed,
+            }
     else:
         log.info("No data available. Returning %s", velocity_results)
     return velocity_results
 
 
 def github_community_health_percentage(
-        base_data: Dict,
-        log: logging.Logger) -> Dict[int, Dict[str, Union[float, bool]]]:
+    base_data: Dict, log: logging.Logger
+) -> Dict[int, Dict[str, Union[float, bool]]]:
     """
     Retrieves information about the GitHub community health percentage metric.
     As the formula introduced by GitHub is questionable, potential relevant
@@ -510,41 +525,48 @@ def github_community_health_percentage(
             code_of_conduct = bool(data.get("files").get("code_of_conduct"))
             contributing = bool(data.get("files").get("contributing"))
             issue_template = bool(data.get("files").get("issue_template"))
-            pull_request_template = bool(
-                data.get("files").get("pull_request_template"))
+            pull_request_template = bool(data.get("files").get("pull_request_template"))
             license_bool = bool(data.get("files").get("license"))
             readme = bool(data.get("files").get("readme"))
-            info_list = [description, documentation, code_of_conduct,
-                         contributing, issue_template, pull_request_template,
-                         license_bool, readme]
+            info_list = [
+                description,
+                documentation,
+                code_of_conduct,
+                contributing,
+                issue_template,
+                pull_request_template,
+                license_bool,
+                readme,
+            ]
             true_count = info_list.count(True)
             false_count = info_list.count(False)
             if sum(info_list) > 0:
-                custom_health_percentage = (
-                    sum(info_list) / len(info_list)) * 100
+                custom_health_percentage = (sum(info_list) / len(info_list)) * 100
             else:
                 custom_health_percentage = None
-            infos = {"community_health_score": score,
-                     "custom_health_score": custom_health_percentage,
-                     "true_count": true_count,
-                     "false_count": false_count,
-                     "description": description,
-                     "documentation": documentation,
-                     "code_of_conduct": code_of_conduct,
-                     "contributing": contributing,
-                     "issue_template": issue_template,
-                     "pull_request_template": pull_request_template,
-                     "license": license_bool,
-                     "readme": readme}
+            infos = {
+                "community_health_score": score,
+                "custom_health_score": custom_health_percentage,
+                "true_count": true_count,
+                "false_count": false_count,
+                "description": description,
+                "documentation": documentation,
+                "code_of_conduct": code_of_conduct,
+                "contributing": contributing,
+                "issue_template": issue_template,
+                "pull_request_template": pull_request_template,
+                "license": license_bool,
+                "readme": readme,
+            }
             community_health_info[repo] = infos
     else:
         log.info("No data available. Returning %s", community_health_info)
     return community_health_info
 
 
-def issues(base_data: Dict,
-           filter_date: date,
-           log: logging.Logger) -> Dict[int, Dict[str, float]]:
+def issues(
+    base_data: Dict, filter_date: date, log: logging.Logger
+) -> Dict[int, Dict[str, float]]:
     """
     Returns information about issues, excluding pulls.
     :param data_object: Request object, required to gather data
@@ -583,8 +605,8 @@ def issues(base_data: Dict,
                         state = issue.get("state")
                         issue_created_at = issue.get("created_at")
                         issue_created_at = datetime.strptime(
-                            issue_created_at,
-                            '%Y-%m-%dT%H:%M:%SZ')
+                            issue_created_at, "%Y-%m-%dT%H:%M:%SZ"
+                        )
                         if isinstance(issue_created_at, datetime):
                             issue_created_at = issue_created_at.date()
                         if issue_created_at >= filter_date:
@@ -609,17 +631,17 @@ def issues(base_data: Dict,
                                 first_comment_date = comments[0].get("created_at")
                                 if first_comment_date:
                                     first_comment_date = datetime.strptime(
-                                        first_comment_date,
-                                        '%Y-%m-%dT%H:%M:%SZ')
+                                        first_comment_date, "%Y-%m-%dT%H:%M:%SZ"
+                                    )
                                     if isinstance(first_comment_date, datetime):
-                                        first_comment_date = \
-                                            first_comment_date.date()
+                                        first_comment_date = first_comment_date.date()
                                     first_response_time = (
-                                        first_comment_date -
-                                        issue_created_at)
+                                        first_comment_date - issue_created_at
+                                    )
                                     first_response_time = first_response_time.days
                                     issue_first_response_times.append(
-                                        first_response_time)
+                                        first_response_time
+                                    )
                         # Count states
                         if state == "open":
                             open_issues += 1
@@ -628,7 +650,8 @@ def issues(base_data: Dict,
                             closed_at = issue.get("closed_at")
                             if closed_at:
                                 closed_at = datetime.strptime(
-                                    closed_at, '%Y-%m-%dT%H:%M:%SZ')
+                                    closed_at, "%Y-%m-%dT%H:%M:%SZ"
+                                )
                                 if isinstance(closed_at, datetime):
                                     closed_at = closed_at.date()
                             date_diff = closed_at - issue_created_at
@@ -648,15 +671,15 @@ def issues(base_data: Dict,
                     for issue_datetime in issue_creation_times:
                         if isinstance(issue_datetime, datetime):
                             issue_datetime = issue_datetime.date()
-                        week_index = (issue_datetime -
-                                      earliest_date).days // 7
+                        week_index = (issue_datetime - earliest_date).days // 7
                         elements_per_week[week_index] += 1
                     average_per_week = round(np.mean(elements_per_week))
                 if issue_close_times:
                     avg_date_diff = round(np.mean(issue_close_times))
                 if issue_first_response_times:
-                    avg_first_response_time_days = round(np.mean(
-                        issue_first_response_times))
+                    avg_first_response_time_days = round(
+                        np.mean(issue_first_response_times)
+                    )
                 if comment_count_list:
                     avg_issue_comments = round(np.mean(comment_count_list))
                 if total_issues:
@@ -673,10 +696,10 @@ def issues(base_data: Dict,
                 "average_issues_created_per_week": average_per_week,
                 "average_issue_comments": avg_issue_comments,
                 "average_issue_resolving_days": avg_date_diff,
-                "average_first_response_time_days":
-                avg_first_response_time_days,
+                "average_first_response_time_days": avg_first_response_time_days,
                 "ratio_open_total": ratio_open,
-                "ratio_closed_total": ratio_closed}
+                "ratio_closed_total": ratio_closed,
+            }
     else:
         log.info("No data available. Returning %s", issues_infos)
 
@@ -747,15 +770,14 @@ def support_rate(base_data: Dict, log: logging.Logger) -> Dict[int, float]:
                     pulls_support = pulls_with_response / total_pulls
                 else:
                     pulls_support = 0
-                support_rate_val = ((issue_support + pulls_support)/2)*100
+                support_rate_val = ((issue_support + pulls_support) / 2) * 100
             support_rate_results[repo] = support_rate_val
     else:
         log.info("No data available. Returning %s", support_rate_results)
     return support_rate_results
 
 
-def code_dependency(base_data: Dict,
-                    log: logging.Logger) -> Dict[int, Dict]:
+def code_dependency(base_data: Dict, log: logging.Logger) -> Dict[int, Dict]:
     """
     Dependencies retrieved from GitHub's Dependency Graph.
     Upstream dependencies show on how many other projects
@@ -783,16 +805,21 @@ def code_dependency(base_data: Dict,
                     if upstream_dep != "-":
                         total_upstream += 1
                 total_downstream = data.get("total_dependents")
-            dependencies[repo] = {"total_upstream": total_upstream,
-                                  "total_downstream": total_downstream}
+            dependencies[repo] = {
+                "total_upstream": total_upstream,
+                "total_downstream": total_downstream,
+            }
     else:
         log.info("No data available. Returning %s", dependencies)
     return dependencies
 
 
-def security_advisories(base_data: Dict, log: logging.Logger) -> \
-    Tuple[Dict[int, Dict[str, Union[int, float, None]]],
-          Dict[int, Dict[str, Union[int, float, str, bool]]]]:
+def security_advisories(
+    base_data: Dict, log: logging.Logger
+) -> Tuple[
+    Dict[int, Dict[str, Union[int, float, None]]],
+    Dict[int, Dict[str, Union[int, float, str, bool]]],
+]:
     """
     Uses GitHub's security advisories to retrieve information and calculate
     basic scores.
@@ -844,8 +871,7 @@ def security_advisories(base_data: Dict, log: logging.Logger) -> \
                     if vulnerabilities:
                         for vul_dict in vulnerabilities:
                             # package_name = vul_dict.get("package").get("name")
-                            package_patched = bool(
-                                vul_dict.get("patched_versions"))
+                            package_patched = bool(vul_dict.get("patched_versions"))
                             if package_patched:
                                 vuln_patched += 1
                             else:
@@ -857,14 +883,17 @@ def security_advisories(base_data: Dict, log: logging.Logger) -> \
                         "state": state,
                         "published_at": published_at,
                         "cvss_score": cvss_score,
-                        "cwes": cwes}
+                        "cwes": cwes,
+                    }
                 severity_high_count = severities.count("high")
                 severity_critical_count = severities.count("critical")
-                severity_high_critical_total = (severity_high_count +
-                                                severity_critical_count)
+                severity_high_critical_total = (
+                    severity_high_count + severity_critical_count
+                )
                 if severities:
-                    ratio_severity_high_crit = (severity_high_critical_total /
-                                                len(severities)) * 100
+                    ratio_severity_high_crit = (
+                        severity_high_critical_total / len(severities)
+                    ) * 100
                 else:
                     ratio_severity_high_crit = None
                 if cvss_scores:
@@ -881,17 +910,20 @@ def security_advisories(base_data: Dict, log: logging.Logger) -> \
                     "patch_ratio": patch_ratio,
                     "closed_advisories": closed_adv,
                     "average_cvss_score": mean_cvs_score,
-                    "ratio_severity_high_crit": ratio_severity_high_crit}
+                    "ratio_severity_high_crit": ratio_severity_high_crit,
+                }
             advisory_scores[repo] = scores
             advisory_infos[repo] = advisories
     else:
-        log.info("No data available. Returning %s - %s",
-                 advisory_scores, advisory_infos)
+        log.info(
+            "No data available. Returning %s - %s", advisory_scores, advisory_infos
+        )
     return advisory_scores, advisory_infos
 
 
-def contributions_distributions(base_data: Dict, log: logging.Logger) -> Dict[
-        int, Dict[str, Union[int, float]]]:
+def contributions_distributions(
+    base_data: Dict, log: logging.Logger
+) -> Dict[int, Dict[str, Union[int, float]]]:
     """
     Includes Bus Factor and Scores representing the Pareto Principle.
     :param data_object: Request object, required to gather data
@@ -920,10 +952,8 @@ def contributions_distributions(base_data: Dict, log: logging.Logger) -> Dict[
                 num_contributors_per_files = []
                 if file_committer:
                     for committer_ids in file_committer.values():
-                        num_contributors_per_files.append(
-                            len(committer_ids))
-                    avg_num_contributors_per_file = np.mean(
-                        num_contributors_per_files)
+                        num_contributors_per_files.append(len(committer_ids))
+                    avg_num_contributors_per_file = np.mean(num_contributors_per_files)
                 else:
                     avg_num_contributors_per_file = None
                 committer_per_file = utils.invert_dict(file_committer)
@@ -941,27 +971,24 @@ def contributions_distributions(base_data: Dict, log: logging.Logger) -> Dict[
                 rof_pareto_ist_percentage = 0
                 # Calculate the percentage of contributors which contribute
                 # 80 % of the contributions
-                for contrib, contributions in enumerate(rof_per_contributor,
-                                                        start=1):
+                for contrib, contributions in enumerate(rof_per_contributor, start=1):
                     running_contributions += contributions
                     # if contrib == math.ceil(twenty_percent):
                     if running_contributions >= eighty_percent:
                         rof_pareto_ist = contrib
-                        rof_pareto_ist_percentage = (rof_pareto_ist /
-                                                     total_file_contributer)
+                        rof_pareto_ist_percentage = (
+                            rof_pareto_ist / total_file_contributer
+                        )
                         break
-                rof_pareto_dominant = rof_pareto_ist_percentage*100
+                rof_pareto_dominant = rof_pareto_ist_percentage * 100
                 rof_pareto_tail = 100 - rof_pareto_dominant
-                rof_prot_diff = np.absolute(20-rof_pareto_dominant)
+                rof_prot_diff = np.absolute(20 - rof_pareto_dominant)
             pareto_results = {
-                        "RoF_tail":
-                        rof_pareto_tail,
-                        "RoF_dominant":
-                        rof_pareto_dominant,
-                        "RoF_diff_percent":
-                        rof_prot_diff,
-                        "avg_num_contributors_per_file":
-                        avg_num_contributors_per_file}
+                "RoF_tail": rof_pareto_tail,
+                "RoF_dominant": rof_pareto_dominant,
+                "RoF_diff_percent": rof_prot_diff,
+                "avg_num_contributors_per_file": avg_num_contributors_per_file,
+            }
 
             repo_pareto[repo] = pareto_results
 
@@ -994,8 +1021,7 @@ def contributions_distributions(base_data: Dict, log: logging.Logger) -> Dict[
                         else:
                             contributor = committer.get("email")
                         message = commit_elem.get("message")
-                        co_author_line = re.findall(r"Co-authored-by:(.*?)>",
-                                                    message)
+                        co_author_line = re.findall(r"Co-authored-by:(.*?)>", message)
                         for value in co_author_line:
                             co_author = value.split("<")[-1]
                             total_committer.append(co_author)
@@ -1016,25 +1042,24 @@ def contributions_distributions(base_data: Dict, log: logging.Logger) -> Dict[
                 noc_pareto_ist_percentage = 0
                 # Calculate the percentage of contributors which contribute
                 # 80 % of the contributions
-                for contrib, contributions in enumerate(
-                        commits_sorted, start=1):
+                for contrib, contributions in enumerate(commits_sorted, start=1):
                     running_contributions += contributions
                     if running_contributions >= eighty_percent:
                         noc_pareto_ist = contrib
-                        noc_pareto_ist_percentage = (noc_pareto_ist /
-                                                     total_contributer)
+                        noc_pareto_ist_percentage = noc_pareto_ist / total_contributer
                         break
                     if t_2 <= t_1:
                         t_2 += contributions
                         bus_factor_score += 1
-                noc_pareto_dominant = noc_pareto_ist_percentage*100
+                noc_pareto_dominant = noc_pareto_ist_percentage * 100
                 noc_pareto_tail = 100 - noc_pareto_dominant
-                noc_prot_diff = np.absolute(20-noc_pareto_dominant)
+                noc_prot_diff = np.absolute(20 - noc_pareto_dominant)
             pareto_results = {
                 "bus_factor_score": bus_factor_score,
                 "NoC_tail": noc_pareto_tail,
                 "NoC_dominant": noc_pareto_dominant,
-                "NoC_diff_percent": noc_prot_diff}
+                "NoC_diff_percent": noc_prot_diff,
+            }
             if repo in repo_pareto:
                 repo_pareto[repo].update(pareto_results)
 
@@ -1043,8 +1068,9 @@ def contributions_distributions(base_data: Dict, log: logging.Logger) -> Dict[
     return repo_pareto
 
 
-def number_of_support_contributors(base_data: Dict,
-                                   log: logging.Logger) -> Dict[int, int]:
+def number_of_support_contributors(
+    base_data: Dict, log: logging.Logger
+) -> Dict[int, int]:
     """
     Calculates the number of active contributors per repository
     in the last 6 months and assigns a score to each.
@@ -1079,7 +1105,7 @@ def number_of_support_contributors(base_data: Dict,
                     score = 4
                 elif total_committer > 50:
                     score = 5
-            result_score = score/5*100
+            result_score = score / 5 * 100
             support_contributors[repo] = result_score
     else:
         log.info("No data available. Returning %s", support_contributors)
@@ -1121,26 +1147,21 @@ def elephant_factor(base_data: Dict, log: logging.Logger) -> Dict[int, int]:
                                     user_contrib = user_contributions.get(user)
                                     if org_name and user_contrib:
                                         if org_name in org_contributions:
-                                            org_contributions[org_name] += \
-                                                user_contrib
+                                            org_contributions[org_name] += user_contrib
                                         else:
-                                            org_contributions[org_name] = \
-                                                user_contrib
+                                            org_contributions[org_name] = user_contrib
                             else:
                                 if "login" in organizations.keys():
                                     org_name = organizations.get("login")
                                     user_contrib = user_contributions.get(user)
                                     if org_name and user_contrib:
                                         if org_name in org_contributions:
-                                            org_contributions[org_name] += \
-                                                user_contrib
+                                            org_contributions[org_name] += user_contrib
                                         else:
-                                            org_contributions[org_name] = \
-                                                user_contrib
+                                            org_contributions[org_name] = user_contrib
                     t_1 = sum(org_contributions.values()) * 0.5
                     t_2 = 0
-                    orgs_sorted = sorted(org_contributions.values(),
-                                         reverse=True)
+                    orgs_sorted = sorted(org_contributions.values(), reverse=True)
                     for org_count in orgs_sorted:
                         if isinstance(org_count, int) and t_2 <= t_1:
                             t_2 += org_count
@@ -1161,8 +1182,7 @@ def size_of_community(base_data: Dict, log: logging.Logger) -> Dict[int, float]:
     repo_community = {}
     repository_data = base_data.get("repository")
     contributors_data = base_data.get("contributors")
-    contributor_count = utils.get_contributors(contributors_data,
-                                               check_contrib=False)
+    contributor_count = utils.get_contributors(contributors_data, check_contrib=False)
     if repository_data:
         log.info("Data available. Starting calculation...")
         for repo, data in repository_data.items():
@@ -1180,7 +1200,7 @@ def size_of_community(base_data: Dict, log: logging.Logger) -> Dict[int, float]:
                 score = 4
             elif community_count > 300:
                 score = 5
-            community_score = (score/5) * 100
+            community_score = (score / 5) * 100
             repo_community[repo] = community_score
     else:
         log.info("No data available. Returning %s", repo_community)
@@ -1223,9 +1243,9 @@ def churn(base_data: Dict, log: logging.Logger) -> Dict[int, float]:
     return results_dict
 
 
-def branch_lifecycle(base_data: Dict,
-                     filter_date: date,
-                     log: logging.Logger) -> Dict[int, Dict]:
+def branch_lifecycle(
+    base_data: Dict, filter_date: date, log: logging.Logger
+) -> Dict[int, Dict]:
     """
     Note: avg datediff has less information value if last created branch
     was created years ago.
@@ -1259,17 +1279,21 @@ def branch_lifecycle(base_data: Dict,
                     total_active = len(active_branch_states.get(repo))
                     all_branches.update(active_branch_states[repo])
                 total_branches = len(all_branches)
-                branch_state_counter = collections.Counter(
-                    all_branches.values())
+                branch_state_counter = collections.Counter(all_branches.values())
                 for branch, elements in branches.items():
                     elem = elements[0]
                     if branch != "master":
                         commit = elem.get("commit")
                         if commit:
-                            commit_date = elem.get(
-                                "commit").get("commit").get("author").get("date")
-                            commit_date = datetime.strptime(commit_date,
-                                                            '%Y-%m-%dT%H:%M:%SZ')
+                            commit_date = (
+                                elem.get("commit")
+                                .get("commit")
+                                .get("author")
+                                .get("date")
+                            )
+                            commit_date = datetime.strptime(
+                                commit_date, "%Y-%m-%dT%H:%M:%SZ"
+                            )
                             if isinstance(commit_date, datetime):
                                 commit_date = commit_date.date()
                         else:
@@ -1311,11 +1335,11 @@ def branch_lifecycle(base_data: Dict,
                     filter_date = filter_date.date()
                 # Calculate age for each date
                 for open_date in open_dates:
-                    time_diff_till_today += (filter_date - open_date)
+                    time_diff_till_today += filter_date - open_date
                 counter = 0
                 for i in range(1, len(dates), 1):
                     counter += 1
-                    time_difference += dates[i] - dates[i-1]
+                    time_difference += dates[i] - dates[i - 1]
                 # Time frequencies are only considered to be valid
                 # when at least 2 values exist
                 if total_dates > 1 and len(open_dates) > 0:
@@ -1327,16 +1351,14 @@ def branch_lifecycle(base_data: Dict,
                     branch_avg_age_days = None
                     branch_creation_frequency_days = None
             branch_results[repo] = {
-                "branch_creation_frequency_days":
-                branch_creation_frequency_days,
-                "branch_avg_age_days":
-                branch_avg_age_days,
+                "branch_creation_frequency_days": branch_creation_frequency_days,
+                "branch_avg_age_days": branch_avg_age_days,
                 "stale_ratio": stale_ratio,
                 "active_ratio": active_ratio,
                 "unresolved_ratio": unresolved_ratio,
                 "resolved_ratio": resolved_ratio,
-                "branch_state_counter": branch_state_counter
-                }
+                "branch_state_counter": branch_state_counter,
+            }
     else:
         log.info("No data available. Returning %s", branch_results)
     return branch_results
