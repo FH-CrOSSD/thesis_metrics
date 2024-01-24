@@ -70,7 +70,7 @@ class Request:
         self.selected_repos_dict = {}  # type: dict[int, dict]
         self.repository_dict = {}  # type: dict[int, list[dict[str, Any]]]
         curr_path = Path(os.path.dirname(__file__))
-        query_features_file = open(os.path.join(curr_path.parents[1],"query_features.json"), encoding="utf-8")
+        query_features_file = open(os.path.join(curr_path.parents[0],"query_features.json"), encoding="utf-8")
         self.query_features = json.load(query_features_file)
         self.logger = get_logger(__name__)
        
