@@ -30,8 +30,9 @@ class MetricsPipeline():
         self.languages = set()
         self.data_dict = self.read_json()
         self.filter_date = filter_date
-        metrics_objective_mapping = open(
-            "mdi_thesis/metrics_data_mapping.json", encoding="utf-8")
+        curr_path = Path(os.path.dirname(__file__))
+        metrics_objective_mapping = open(os.path.join(curr_path.parents[0],
+            "metrics_data_mapping.json"), encoding="utf-8")
         self.metrics_objective_mapping = json.load(metrics_objective_mapping)
         self.metric_periods = {}
         self.metric_objective_periods = {}
