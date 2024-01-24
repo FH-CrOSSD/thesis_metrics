@@ -69,11 +69,11 @@ class Request:
         self.response = requests.Response()
         self.selected_repos_dict = {}  # type: dict[int, dict]
         self.repository_dict = {}  # type: dict[int, list[dict[str, Any]]]
-        query_features_file = open(
-            "mdi_thesis/query_features.json", encoding="utf-8")
+        curr_path = Path(os.path.dirname(__file__))
+        query_features_file = open(os.path.join(curr_path.parents[1],"query_features.json"), encoding="utf-8")
         self.query_features = json.load(query_features_file)
         self.logger = get_logger(__name__)
-        curr_path = Path(os.path.dirname(__file__))
+       
         self.output_path = os.path.join(curr_path.parents[1],
                                         "outputs/data/", )
         self.filter_date = filter_date
