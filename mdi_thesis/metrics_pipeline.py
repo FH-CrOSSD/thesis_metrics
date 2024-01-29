@@ -40,10 +40,10 @@ class MetricsPipeline:
         self.metric_periods = {}
         self.metric_objective_periods = {}
 
-        parent_dir = os.path.abspath(".")
-        if parent_dir not in sys.path:
-            sys.path.append(parent_dir)
-        self.output_path = os.path.join(parent_dir, "outputs", "results")
+        # parent_dir = os.path.abspath(".")
+        # if parent_dir not in sys.path:
+        #     sys.path.append(parent_dir)
+        self.output_path = os.path.join(curr_path.parents[0], "outputs", "results")
 
     def read_json(self):
         """
