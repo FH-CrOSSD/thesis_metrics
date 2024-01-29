@@ -55,7 +55,7 @@ class MetricsPipeline:
         # if parent_dir not in sys.path:
         #     sys.path.append(parent_dir[0])
         combined_dict = {}
-        path = os.path.join(parent_dir.parents[1], "outputs", "data")
+        path = os.path.join(parent_dir.parents[0], "outputs", "data")
         # path = os.path.join(parent_dir, "outputs", "data")
         self.logger.info("Reading json files from path %s", path)
         for filename in os.listdir(path):
