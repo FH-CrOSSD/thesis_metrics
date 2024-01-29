@@ -5,19 +5,20 @@ data cleaning and data storage.
 import json
 import os
 import re
-import numpy as np
+
+# import numpy as np
 from typing import Dict, List, Any, Union
 
 
-class npEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.int32):
-            return int(obj)
-        return json.JSONEncoder.default(self, obj)
+# class npEncoder(json.JSONEncoder):
+#     def default(self, obj):
+#         if isinstance(obj, np.int32):
+#             return int(obj)
+#         return json.JSONEncoder.default(self, obj)
 
 
 def __get_ids_from_txt__(path: str) -> List[int]:
-    with open(path, encoding='utf-8') as file:
+    with open(path, encoding="utf-8") as file:
         lines = file.read().splitlines()
         ids = [int(i) for i in lines]
         return ids
@@ -97,13 +98,11 @@ def get_contributor_per_files(commit: Dict) -> Dict[str, set]:
             files = row.get("files")
             try:
                 co_authors = set()
-                committer_email = row.get(
-                    "commit").get("committer").get("email")
+                committer_email = row.get("commit").get("committer").get("email")
                 author_email = row.get("commit").get("author").get("email")
                 message = row.get("commit").get("message")
                 co_author_line = re.findall(r"Co-authored-by:(.*?)>", message)
-                verification = row.get("commit").get(
-                    "verification").get("verified")
+                verification = row.get("commit").get("verification").get("verified")
                 for value in co_author_line:
                     co_author = value.split("<")[-1]
                     co_authors.add(co_author)
@@ -128,8 +127,7 @@ def get_contributor_per_files(commit: Dict) -> Dict[str, set]:
                 else:
                     existing_file = file_committer.get(filename)
                     if existing_file:
-                        file_committer[filename] = existing_file.union(
-                            contributors)
+                        file_committer[filename] = existing_file.union(contributors)
     return file_committer
 
 
@@ -140,9 +138,10 @@ def dict_to_json(data: Union[Dict, List], data_path: str, feature: str):
     :param data_path: Path where file should be written.
     :param feature: Feature for filename.
     """
-    json_object = json.dumps(data, indent=4, cls=npEncoder)
+    # json_object = json.dumps(data, indent=4, cls=npEncoder)
+    json_object = json.dumps(data, indent=4)
     file_name = os.path.join(data_path, (feature + ".json"))
-    with open(file_name, "w", encoding='utf-8') as outfile:
+    with open(file_name, "w", encoding="utf-8") as outfile:
         outfile.write(json_object)
 
 
@@ -152,6 +151,6 @@ def json_to_dict(path: str) -> Dict:
     :param path: Path to json file
     :return: dictionary with json content
     """
-    with open(path, encoding='utf-8') as json_file:
+    with open(path, encoding="utf-8") as json_file:
         data = json.load(json_file)
     return data
