@@ -11,12 +11,13 @@ import math
 import logging
 from datetime import date, datetime, timedelta
 from dateutil import relativedelta
-import numpy as np
+# import numpy as np
 import regex as re
 import mdi_thesis.base.utils as utils
 import mdi_thesis.external as external
 from pathlib import Path
 import os.path
+import statistics
 
 
 def maturity_level(
@@ -170,7 +171,7 @@ def technical_fork(
                     for fork_datetime in created_at_times:
                         week_index = (fork_datetime.date() - earliest_date).days // 7
                         elements_per_week[week_index] += 1
-                    average_per_week = round(np.mean(elements_per_week))
+                    average_per_week = round(statistics.fmean(elements_per_week))
             fork_results[repo] = {
                 "total_forks": fork_nr,
                 "average_forks_created_per_week": average_per_week,
@@ -264,7 +265,7 @@ def criticality_score(
                     for commit_datetime in repo_commit_dates:
                         week_index = (commit_datetime.date() - earliest_date).days // 7
                         elements_per_week[week_index] += 1
-                    average_per_week = np.mean(elements_per_week)
+                    average_per_week = statistics.fmean(elements_per_week)
             scores_per_repo[repo].update({"commit_frequency": average_per_week})
             # recent_releases_count
             releases = release_data.get(repo)
@@ -318,7 +319,7 @@ def criticality_score(
                                 comment_len += 1
                     comment_count_list.append(comment_len)
                 if comment_count_list:
-                    avg_comment_count = np.mean(comment_count_list)
+                    avg_comment_count = statistics.fmean(comment_count_list)
             scores_per_repo[repo].update({"comment_frequency": avg_comment_count})
             # dependents_count
             downstream_dep = dependents.get(repo)
@@ -343,9 +344,9 @@ def criticality_score(
         form_1 = 1 / weight_sum
         sum_alpha = 0
         for param_name, value in param.items():
-            log_1 = np.log(1 + value)
+            log_1 = math.log(1 + value)
             max_threshold = weights.get(param_name).get("max_threshold")
-            log_2 = np.log(1 + max(value, max_threshold))
+            log_2 = math.log(1 + max(value, max_threshold))
             if log_2 == 0:
                 res_fraction = 1
             else:
@@ -406,7 +407,7 @@ def pull_requests(base_data: Dict, log: logging.Logger) -> Dict[int, Dict[str, f
                     elif state == "closed":
                         state_closed += 1
                 if len(date_diffs) > 0:
-                    avg_date_diff = np.mean(date_diffs)
+                    avg_date_diff = statistics.fmean(date_diffs)
 
                 if total_pulls > 0:
                     ratio_open = (state_open / total_pulls) * 100
@@ -478,7 +479,7 @@ def project_velocity(
                 pull_count = pull_issue_list.count(True)
                 no_pull_count = pull_issue_list.count(False)
                 if len(date_diffs) > 0:
-                    avg_date_diff = round(np.mean(date_diffs))
+                    avg_date_diff = round(statistics.fmean(date_diffs))
                 if total_issues > 0:
                     ratio_open = (open_issues / total_issues) * 100
                     ratio_closed = (closed_issues / total_issues) * 100
@@ -673,15 +674,15 @@ def issues(
                             issue_datetime = issue_datetime.date()
                         week_index = (issue_datetime - earliest_date).days // 7
                         elements_per_week[week_index] += 1
-                    average_per_week = round(np.mean(elements_per_week))
+                    average_per_week = round(statistics.fmean(elements_per_week))
                 if issue_close_times:
-                    avg_date_diff = round(np.mean(issue_close_times))
+                    avg_date_diff = round(statistics.fmean(issue_close_times))
                 if issue_first_response_times:
                     avg_first_response_time_days = round(
-                        np.mean(issue_first_response_times)
+                        statistics.fmean(issue_first_response_times)
                     )
                 if comment_count_list:
-                    avg_issue_comments = round(np.mean(comment_count_list))
+                    avg_issue_comments = round(statistics.fmean(comment_count_list))
                 if total_issues:
                     ratio_open = (open_issues / total_issues) * 100
                     ratio_closed = (closed_issues / total_issues) * 100
@@ -897,7 +898,7 @@ def security_advisories(
                 else:
                     ratio_severity_high_crit = None
                 if cvss_scores:
-                    mean_cvs_score = np.mean(cvss_scores)
+                    mean_cvs_score = statistics.fmean(cvss_scores)
                 else:
                     mean_cvs_score = None
                 total_vuln = vuln_patched + vuln_not_patched
@@ -953,7 +954,7 @@ def contributions_distributions(
                 if file_committer:
                     for committer_ids in file_committer.values():
                         num_contributors_per_files.append(len(committer_ids))
-                    avg_num_contributors_per_file = np.mean(num_contributors_per_files)
+                    avg_num_contributors_per_file = statistics.fmean(num_contributors_per_files)
                 else:
                     avg_num_contributors_per_file = None
                 committer_per_file = utils.invert_dict(file_committer)
@@ -982,7 +983,7 @@ def contributions_distributions(
                         break
                 rof_pareto_dominant = rof_pareto_ist_percentage * 100
                 rof_pareto_tail = 100 - rof_pareto_dominant
-                rof_prot_diff = np.absolute(20 - rof_pareto_dominant)
+                rof_prot_diff = abs(20 - rof_pareto_dominant)
             pareto_results = {
                 "RoF_tail": rof_pareto_tail,
                 "RoF_dominant": rof_pareto_dominant,
@@ -1053,7 +1054,7 @@ def contributions_distributions(
                         bus_factor_score += 1
                 noc_pareto_dominant = noc_pareto_ist_percentage * 100
                 noc_pareto_tail = 100 - noc_pareto_dominant
-                noc_prot_diff = np.absolute(20 - noc_pareto_dominant)
+                noc_prot_diff = abs(20 - noc_pareto_dominant)
             pareto_results = {
                 "bus_factor_score": bus_factor_score,
                 "NoC_tail": noc_pareto_tail,
