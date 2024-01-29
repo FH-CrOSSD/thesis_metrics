@@ -33,7 +33,7 @@ class MetricsPipeline:
         self.filter_date = filter_date
         curr_path = Path(os.path.dirname(__file__))
         metrics_objective_mapping = open(
-            os.path.join(curr_path.parents[0], "metrics_data_mapping.json"),
+            os.path.join(curr_path, "metrics_data_mapping.json"),
             encoding="utf-8",
         )
         self.metrics_objective_mapping = json.load(metrics_objective_mapping)
