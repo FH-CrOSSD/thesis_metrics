@@ -22,6 +22,11 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import mdi_thesis.constants as constants
 import mdi_thesis.base.utils as utils
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -34,16 +39,18 @@ def get_logger(name: str) -> logging.Logger:
     if not logger.handlers:
         console = logging.StreamHandler()
         logger.addHandler(console)
-        log_formatting = ("%(asctime)s - %(levelname)s " +
-                          "- line: " +
-                          "%(lineno)s - %(funcName)s - " +
-                          "%(module)s - %(message)s")
+        log_formatting = (
+            "%(asctime)s - %(levelname)s "
+            + "- line: "
+            + "%(lineno)s - %(funcName)s - "
+            + "%(module)s - %(message)s"
+        )
         formatter = logging.Formatter(log_formatting)
         console.setFormatter(formatter)
         logger.setLevel(logging.DEBUG)
         curr_path = Path(os.path.dirname(__file__))
         log_path = curr_path.parents[1]
-        file_name = datetime.now().strftime('logger_%Y%m%d_%H_%M')
+        file_name = datetime.now().strftime("logger_%Y%m%d_%H_%M")
         file_path = os.path.join("outputs/logs/", file_name)
         file_handler = logging.FileHandler(f"{log_path}/{file_path}.log")
         file_handler.setFormatter(formatter)
@@ -56,33 +63,39 @@ class Request:
     """
     Class for GitHub Request
     """
+
     def __init__(self, filter_date) -> None:
         self.token = constants.API_TOKEN
         self.results_per_page = 100
         self.headers = {"Authorization": "token " + self.token}
         self.session = requests.Session()
-        retry = Retry(total=3, backoff_factor=0.5)  
+        retry = Retry(total=3, backoff_factor=0.5)
         adapter = HTTPAdapter(max_retries=retry)
-        self.session.mount('http://', adapter)
-        self.session.mount('https://', adapter)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
         self.response = requests.Response()
         self.selected_repos_dict = {}  # type: dict[int, dict]
         self.repository_dict = {}  # type: dict[int, list[dict[str, Any]]]
         curr_path = Path(os.path.dirname(__file__))
-        query_features_file = open(os.path.join(curr_path.parents[0],"query_features.json"), encoding="utf-8")
+        query_features_file = open(
+            os.path.join(curr_path.parents[0], "query_features.json"), encoding="utf-8"
+        )
         self.query_features = json.load(query_features_file)
         self.logger = get_logger(__name__)
-       
-        self.output_path = os.path.join(curr_path.parents[1],
-                                        "outputs/data/", )
+
+        self.output_path = os.path.join(
+            curr_path.parents[1],
+            "outputs/data/",
+        )
         self.filter_date = filter_date
 
+        options = FirefoxOptions()
+        options.add_argument("--headless")
+        self.browser = webdriver.Firefox(options=options)
+
     def select_repos(
-        self,
-        repo_nr: int,
-        repo_list: List[int],
-        query_parameters: str = ""
+        self, repo_nr: int, repo_list: List[int], query_parameters: str = ""
     ):
         """
         Select Repositories according to Parameters
@@ -102,19 +115,17 @@ class Request:
             for item in repo_list:
                 url = f"https://api.github.com/repos/{item}"
                 self.logger.debug("URL = %s", url)
-                response = self.session.get(
-                    url, headers=self.headers, timeout=100)
+                response = self.session.get(url, headers=self.headers, timeout=100)
                 while response.status_code != 200:
                     self.logger.error("Could not retrieve item %s", item)
                     self.logger.error(
-                        "Message: %s - %s", response.status_code,
-                        response.json())
+                        "Message: %s - %s", response.status_code, response.json()
+                    )
                     if response.status_code == 404:
                         break
                     else:
                         self.check_rate_limit(response=response)
-                    response = self.session.get(
-                        url, headers=self.headers, timeout=100)
+                    response = self.session.get(url, headers=self.headers, timeout=100)
                 results = response.json()
                 while "next" in response.links.keys():
                     res = self.session.get(
@@ -124,13 +135,13 @@ class Request:
                 selected_repos.append(results)
                 self.logger.debug("Append results for object id: %s", item)
             self.logger.debug(
-                "Number of repos before cleaning: %s", len(selected_repos))
+                "Number of repos before cleaning: %s", len(selected_repos)
+            )
             self.selected_repos_dict = utils.clean_results(selected_repos)
             self.logger.debug(
-                "Number of repos after cleaning: %s",
-                len(self.selected_repos_dict))
-            self.logger.debug(
-                "Final object_ids: %s", self.selected_repos_dict.keys())
+                "Number of repos after cleaning: %s", len(self.selected_repos_dict)
+            )
+            self.logger.debug("Final object_ids: %s", self.selected_repos_dict.keys())
         else:
             search_url = (
                 "https://api.github.com/search/repositories?q="
@@ -138,9 +149,7 @@ class Request:
                 + "&per_page="
                 + str(res_per_page)
             )
-            initial_search_url = (
-                search_url
-            )
+            initial_search_url = search_url
             self.logger.debug("Initial search query: %s", initial_search_url)
 
             results = []
@@ -148,12 +157,12 @@ class Request:
             while True:
                 try:
                     response = self.session.get(
-                        initial_search_url, headers=self.headers, timeout=100)
+                        initial_search_url, headers=self.headers, timeout=100
+                    )
                     if response.status_code == 200:
                         results = response.json()
                         total_count = results["total_count"]
-                        self.logger.debug("Total found repositories: %s",
-                                          total_count)
+                        self.logger.debug("Total found repositories: %s", total_count)
                         if "items" in results:
                             results_items = results["items"]
                             if repo_nr <= 100:
@@ -164,24 +173,22 @@ class Request:
                                 results = self.get_next_search_pages(
                                     response=response,
                                     results=results_items,
-                                    target_num=repo_nr)
+                                    target_num=repo_nr,
+                                )
                                 selected_repos.extend(results)
                                 self.logger.debug(
-                                    "Number of selected repos: %s",
-                                    len(selected_repos))
-                                cleaned_results = utils.clean_results(
-                                    selected_repos)
+                                    "Number of selected repos: %s", len(selected_repos)
+                                )
+                                cleaned_results = utils.clean_results(selected_repos)
                                 self.logger.debug(
-                                    "Number of cleaned repos: %s",
-                                    len(cleaned_results))
+                                    "Number of cleaned repos: %s", len(cleaned_results)
+                                )
                                 if len(cleaned_results) >= repo_nr:
-                                    self.logger.debug(
-                                        "Total repositories found.")
+                                    self.logger.debug("Total repositories found.")
                                     break
                                 if len(cleaned_results) == total_count:
                                     self.logger.debug(
-                                        "Reached end of total return: %s",
-                                        total_count
+                                        "Reached end of total return: %s", total_count
                                     )
                                     break
                     else:
@@ -200,14 +207,13 @@ class Request:
         required waiting time.
         :param response: Response to get required waiting time.
         """
-        unix_time_to_reset = response.headers.get(
-            "X-RateLimit-Reset")
+        unix_time_to_reset = response.headers.get("X-RateLimit-Reset")
         datetime_to_reset = datetime.fromtimestamp(int(unix_time_to_reset))
         time_till_rerun = abs(datetime_to_reset - datetime.now())
-        minutes_till_rerun = math.ceil(
-            (time_till_rerun.total_seconds()) / 60)
-        self.logger.critical("API rate exceeded. Sleeping %s minutes.",
-                             minutes_till_rerun)
+        minutes_till_rerun = math.ceil((time_till_rerun.total_seconds()) / 60)
+        self.logger.critical(
+            "API rate exceeded. Sleeping %s minutes.", minutes_till_rerun
+        )
         time.sleep(time_till_rerun.total_seconds())
 
     def get_next_search_pages(self, response, results, target_num):
@@ -217,30 +223,25 @@ class Request:
         :param results: Results returned by first response
         :param targe_num: Number of wanted results.
         """
-        if 'next' in response.links:
+        if "next" in response.links:
             is_next = True
         else:
             is_next = False
         while is_next:
             try:
-                if 'next' in response.links:
-                    next_url = response.links['next']['url']
-                    self.logger.debug("Search query: %s",
-                                      next_url)
-                    response = self.session.get(next_url,
-                                                headers=self.headers)
+                if "next" in response.links:
+                    next_url = response.links["next"]["url"]
+                    self.logger.debug("Search query: %s", next_url)
+                    response = self.session.get(next_url, headers=self.headers)
                     if response.status_code in [403, 429]:
-                        self.logger.critical("Status code: %s",
-                                             response.status_code)
+                        self.logger.critical("Status code: %s", response.status_code)
                         self.check_rate_limit(response=response)
                         continue
                     elif response in [400, 401, 404, 406, 410]:
-                        self.logger.critical("Status code: %s",
-                                             response.status_code)
+                        self.logger.critical("Status code: %s", response.status_code)
                         break
                     elif response.status_code in [500, 502, 503, 504]:
-                        self.logger.critical("Status code: %s",
-                                             response.status_code)
+                        self.logger.critical("Status code: %s", response.status_code)
                         time.sleep(240)
                         continue
                     elif response.status_code == 200:
@@ -255,7 +256,9 @@ class Request:
             except KeyError as key_error:
                 self.logger.error(
                     "Query failed: KeyError: %s at response status code: %s",
-                    key_error, response.status_code)
+                    key_error,
+                    response.status_code,
+                )
                 time.sleep(5)
                 continue
         return results
@@ -266,32 +269,26 @@ class Request:
         filters: Dict[str, Any],
         updated_at_filt: Union[str, None] = None,
         created_at_filt: Union[str, None] = None,
-        repo_list: Union[List[int], None] = None
+        repo_list: Union[List[int], None] = None,
     ) -> Union[Dict[str, List[Dict[str, Any]]], Dict[str, Dict]]:
         """
         Calls functions which perform actual query.
         :param queried_features: List with gathered features
         :return:
         """
-        self.logger.info("Getting request information for feature(s): %s",
-                         queried_features)
+        self.logger.info(
+            "Getting request information for feature(s): %s", queried_features
+        )
         feature_list = []  # type: list[str]
         query_dict = {}  # type: dict[str, list]
         # Collect URLs for the to be queried API endpoints and the
         # desired features to filter returned data.
         if queried_features:
             for feature in queried_features:
-                feature_list = (
-                    self.query_features.get(feature).get("feature_list")
-                )
-                request_url_1 = (
-                    self.query_features.get(feature).get("request_url_1")
-                )
-                request_url_2 = (
-                    self.query_features.get(feature).get("request_url_2")
-                )
-                query_dict[feature] = [
-                    feature_list, request_url_1, request_url_2]
+                feature_list = self.query_features.get(feature).get("feature_list")
+                request_url_1 = self.query_features.get(feature).get("request_url_1")
+                request_url_2 = self.query_features.get(feature).get("request_url_2")
+                query_dict[feature] = [feature_list, request_url_1, request_url_2]
         request_data_dict = {}
         for param, query in query_dict.items():
             if "organization_users" in queried_features:
@@ -306,20 +303,15 @@ class Request:
                 filters=filters,
                 repo_list=repo_list,
                 updated_at_filt=updated_at_filt,
-                created_at_filt=created_at_filt
+                created_at_filt=created_at_filt,
             )
             request_data_dict[param] = param_list
 
         return request_data_dict
 
-    def get_single_object(self,
-                          feature: str,
-                          filters: Dict[str, Any],
-                          output_format: str
-                          ) -> Dict[int,
-                                    List[Dict[int,
-                                              List[Dict[str,
-                                                        Any]]]]]:
+    def get_single_object(
+        self, feature: str, filters: Dict[str, Any], output_format: str
+    ) -> Dict[int, List[Dict[int, List[Dict[str, Any]]]]]:
         """
         Function to retrieve issues and the comments for each.
         Note: Issues also contain pull requests.
@@ -327,40 +319,37 @@ class Request:
         :return: A dictionary with the repository id,
         its issue ids and the comments per issue.
         """
-        request_url_1 = self.query_features.get(
-            feature).get("request_url_1")
-        request_url_2 = self.query_features.get(
-            feature).get("request_url_2")
-        request_url_3 = self.query_features.get(
-            feature).get("request_url_3")
+        request_url_1 = self.query_features.get(feature).get("request_url_1")
+        request_url_2 = self.query_features.get(feature).get("request_url_2")
+        request_url_3 = self.query_features.get(feature).get("request_url_3")
         try:
             filter_date = filters.get("since")
             if filter_date:
                 if filter_date[0] == "=":
                     filter_date = filter_date[1:]
-                filter_date = datetime.strptime(filter_date,
-                                                '%Y-%m-%dT%H:%M:%SZ')
+                filter_date = datetime.strptime(filter_date, "%Y-%m-%dT%H:%M:%SZ")
         except AttributeError:
             filter_date = None
         self.logger.debug("Set filter date to %s", filter_date)
         self.logger.info("Starting query for repository request...")
 
         objects_per_repo = self.query_repository(
-            queried_features=[feature], filters=filters).get(
+            queried_features=[feature], filters=filters
+        ).get(
             feature
         )  # Object e.g. issue or commit
         self.logger.info("Finished main query for features: %s", feature)
         object_key = self.query_features.get(feature).get("feature_key")
         single_object_dict = {}
-        subfeature_list = self.query_features.get(
-            feature).get("subfeature_list")
+        subfeature_list = self.query_features.get(feature).get("subfeature_list")
         self.logger.info("Finished main query for feature: %s", feature)
         if isinstance(objects_per_repo, Dict):
             self.logger.info("Getting subfeatures for: %s", feature)
             for repo_num, repository in enumerate(objects_per_repo, start=1):
                 if repo_num % 100 == 0:
-                    self.logger.info("Getting repo Nr. %s of %s",
-                                     repo_num, len(objects_per_repo))
+                    self.logger.info(
+                        "Getting repo Nr. %s of %s", repo_num, len(objects_per_repo)
+                    )
                 if output_format.lower() == "dict":
                     object_storage = {}
                 else:
@@ -369,17 +358,16 @@ class Request:
                 objects = objects_per_repo.get(repository)
                 object_counter = 0
                 self.logger.info(
-                    "Starting querying subfeatures for object %s",
-                    repository)
+                    "Starting querying subfeatures for object %s", repository
+                )
                 if objects:
-                    self.logger.debug("Number of total objects: %s",
-                                      len(objects))
+                    self.logger.debug("Number of total objects: %s", len(objects))
                     for obj in objects:
                         object_counter += 1
                         if object_counter % 100 == 0:
                             self.logger.info(
-                                "Get object Nr. %s of %s",
-                                object_counter, len(objects))
+                                "Get object Nr. %s of %s", object_counter, len(objects)
+                            )
                             time.sleep(3)
 
                         object_id = obj.get(object_key)
@@ -389,7 +377,7 @@ class Request:
                                 object_id=object_id,
                                 object_url=url,
                                 sub_url=request_url_3,
-                                filter_date=filter_date
+                                filter_date=filter_date,
                             )
                         else:
                             self.logger.debug("No object id found.")
@@ -406,11 +394,14 @@ class Request:
         return single_object_dict
 
     def get_repository_data(
-        self, feature_list: List[str], request_url_1: str,
-        request_url_2: str, filters: Dict[str, Any],
+        self,
+        feature_list: List[str],
+        request_url_1: str,
+        request_url_2: str,
+        filters: Dict[str, Any],
         repo_list: Union[List[int], None],
         updated_at_filt: Union[str, None] = None,
-        created_at_filt: Union[str, None] = None
+        created_at_filt: Union[str, None] = None,
     ) -> Dict[int, List[Dict[str, Any]]]:
         """
         Query data from repositories
@@ -432,8 +423,7 @@ class Request:
             for key, value in filters.items():
                 filter_str = filter_str + key + value + "&"
         self.logger.info(
-            "Getting repository data of %s repositories",
-            len(self.selected_repos_dict)
+            "Getting repository data of %s repositories", len(self.selected_repos_dict)
         )
         if repo_list:
             objects = [repo for repo in repo_list if repo is not None]
@@ -446,81 +436,82 @@ class Request:
             # Pass time parameter in a processable format for relativedelta
             updated_split = updated_at_filt.split("=")
             attributes = {str(updated_split[0]): int(updated_split[1])}
-            filter_since = (self.filter_date -
-                            relativedelta.relativedelta(**attributes))
+            filter_since = self.filter_date - relativedelta.relativedelta(**attributes)
         if created_at_filt:
             # Pass time parameter in a processable format for relativedelta
             created_split = created_at_filt.split("=")
             attributes = {str(created_split[0]): int(created_split[1])}
-            filter_since = (self.filter_date -
-                relativedelta.relativedelta(**attributes))
-        self.logger.debug(
-            "Filter date set to %s", filter_since)
+            filter_since = self.filter_date - relativedelta.relativedelta(**attributes)
+        self.logger.debug("Filter date set to %s", filter_since)
         for ind, object_id in enumerate(objects, start=1):
             if ind % 100 == 0:
                 time.sleep(5)
             complete_results = False
             while not complete_results:
                 if not repo_list:
-                    self.logger.info("Getting object Nr. %s of %s",
-                                     ind, len(objects))
+                    self.logger.info("Getting object Nr. %s of %s", ind, len(objects))
                 if request_url_2:
-                    url_repo = str(request_url_1
-                                   + str(object_id)
-                                   + request_url_2)
+                    url_repo = str(request_url_1 + str(object_id) + request_url_2)
                 else:
                     url_repo = str(request_url_1 + str(object_id))
                 if not repo_list:
                     self.logger.info("Getting page 1")
                 start_url = (
-                    str(url_repo) +
-                    "?" +
-                    str(filter_str) +
-                    "per_page=" +
-                    str(self.results_per_page)
-                    )
-                self.logger.info("Object: %s - Start URL: %s",
-                                 object_id, start_url)
+                    str(url_repo)
+                    + "?"
+                    + str(filter_str)
+                    + "per_page="
+                    + str(self.results_per_page)
+                )
+                self.logger.info("Object: %s - Start URL: %s", object_id, start_url)
                 try:
                     response = requests.Response()
                     for i in range(5):
                         response = self.session.get(
-                            start_url, headers=self.headers, timeout=100)
+                            start_url, headers=self.headers, timeout=100
+                        )
                         if response.status_code == 200:
                             break
                         elif response.status_code in [403, 429]:
                             self.logger.critical(
-                                "Status code: %s",
-                                response.status_code)
+                                "Status code: %s", response.status_code
+                            )
                             response_msg = response.json().get("message")
                             if "list is too large" in response_msg:
                                 self.logger.critical(
-                                    "Data volume too large for API %s",
-                                    object_id)
+                                    "Data volume too large for API %s", object_id
+                                )
                                 complete_results = True
                                 break
                             else:
                                 self.check_rate_limit(response=response)
                         elif response.status_code in [400, 401, 404, 406, 410]:
                             self.logger.critical(
-                                "Status code: %s", response.status_code)
+                                "Status code: %s", response.status_code
+                            )
                             self.logger.error(
                                 "Query for repo %s failed: %s - at run %s",
-                                object_id, response, i)
+                                object_id,
+                                response,
+                                i,
+                            )
                             complete_results = True
                             break
 
                         elif response.status_code in [500, 502, 503, 504]:
                             self.logger.critical(
-                                "Status code: %s",
-                                response.status_code)
+                                "Status code: %s", response.status_code
+                            )
                             self.logger.debug(
                                 "Server error at repo %s: %s - Retry in 60s",
-                                object_id, response)
+                                object_id,
+                                response,
+                            )
                             time.sleep(60)
                         if i == 4:
                             self.logger.critical(
-                                "No valid response for object %s", object_id)
+                                "No valid response for object %s", object_id
+                            )
                             complete_results = True
 
                     nr_of_pages = 1
@@ -528,41 +519,40 @@ class Request:
                         last = response.links.get("last")
                         if last:
                             last_url = last.get("url")
-                            nr_of_pages = (
-                                last_url.split("&page=", 1)[1]
-                                )
+                            nr_of_pages = last_url.split("&page=", 1)[1]
 
                     self.logger.info("Querying total pages: %s", nr_of_pages)
                     results = response.json()
                     if response.status_code == 200 and nr_of_pages == 1:
                         complete_results = True
                         continue
-                    next_link = response.links.get('next')
+                    next_link = response.links.get("next")
                     if next_link:
                         while next_link:
                             try:
-                                self.logger.debug("Search query: %s",
-                                                  next_link.get("url"))
+                                self.logger.debug(
+                                    "Search query: %s", next_link.get("url")
+                                )
                                 response = self.session.get(
-                                    response.links['next']['url'],
-                                    headers=self.headers)
-                                next_link = response.links.get('next')
+                                    response.links["next"]["url"], headers=self.headers
+                                )
+                                next_link = response.links.get("next")
                                 if response.status_code in [403, 429]:
                                     self.check_rate_limit(response=response)
-                                elif response.status_code in [400, 401,
-                                                              404, 406, 410]:
+                                elif response.status_code in [400, 401, 404, 406, 410]:
                                     self.logger.error(
-                                        "Query object %s failed:%s",
-                                        object_id, response)
+                                        "Query object %s failed:%s", object_id, response
+                                    )
                                     break
-                                elif response.status_code in [500, 502,
-                                                              503, 504]:
+                                elif response.status_code in [500, 502, 503, 504]:
                                     self.logger.debug(
                                         "Connection failed at object %s:%s",
-                                        object_id, response)
+                                        object_id,
+                                        response,
+                                    )
                                     self.logger.critical(
                                         "ConnectionError: %s - Retry in 5 min.",
-                                        response.status_code
+                                        response.status_code,
                                     )
                                     time.sleep(300)
                                     continue
@@ -572,37 +562,34 @@ class Request:
                                     self.logger.debug("Extending results...")
                                     if updated_at_filt and filter_since:
                                         self.logger.debug(
-                                            "Updated at filter: %s",
-                                            updated_at_filt)
-                                        updated_at = next_result[-1].get(
-                                            "updated_at")
+                                            "Updated at filter: %s", updated_at_filt
+                                        )
+                                        updated_at = next_result[-1].get("updated_at")
                                         upd_date = datetime.strptime(
-                                            updated_at,
-                                            '%Y-%m-%dT%H:%M:%SZ').date()
+                                            updated_at, "%Y-%m-%dT%H:%M:%SZ"
+                                        ).date()
                                         if filter_since > upd_date:
                                             complete_results = True
                                             break
                                     elif created_at_filt and filter_since:
-                                        created_at = next_result[-1].get(
-                                            "created_at")
+                                        created_at = next_result[-1].get("created_at")
                                         create_date = datetime.strptime(
-                                            created_at,
-                                            '%Y-%m-%dT%H:%M:%SZ').date()
+                                            created_at, "%Y-%m-%dT%H:%M:%SZ"
+                                        ).date()
                                         if filter_since > create_date:
                                             complete_results = True
                                             self.logger.debug(
                                                 "Number of total elements: %s",
-                                                len(results))
+                                                len(results),
+                                            )
                                             break
 
                             except AttributeError as att_err:
-                                self.logger.error(
-                                    "Attribute error %s", att_err)
+                                self.logger.error("Attribute error %s", att_err)
                                 time.sleep(10)
                             except ConnectionError as conn_err:
                                 self.logger.critical(
-                                    "ConnectionError: %s - Retry in 5 min.",
-                                    conn_err
+                                    "ConnectionError: %s - Retry in 5 min.", conn_err
                                 )
                                 time.sleep(300)
                                 continue
@@ -611,10 +598,13 @@ class Request:
 
                 except AttributeError as att_error:
                     self.logger.error(
-                        "Could not query Object:%s\nError: %s",
-                        object_id, att_error)
-                    self.logger.debug("Could not query results from Repo: %s \
-                                      ...Retry in 5 minutes.", object_id)
+                        "Could not query Object:%s\nError: %s", object_id, att_error
+                    )
+                    self.logger.debug(
+                        "Could not query results from Repo: %s \
+                                      ...Retry in 5 minutes.",
+                        object_id,
+                    )
                     complete_results = False
                     time.sleep(10)
 
@@ -629,15 +619,15 @@ class Request:
                         if updated_at_filt and filter_since:
                             updated_at = element.get("updated_at")
                             upd_date = datetime.strptime(
-                                updated_at,
-                                '%Y-%m-%dT%H:%M:%SZ').date()
+                                updated_at, "%Y-%m-%dT%H:%M:%SZ"
+                            ).date()
                             if filter_since < upd_date:
                                 get_element = True
                         elif created_at_filt and filter_since:
                             created_at = element.get("created_at")
                             create_date = datetime.strptime(
-                                created_at,
-                                '%Y-%m-%dT%H:%M:%SZ').date()
+                                created_at, "%Y-%m-%dT%H:%M:%SZ"
+                            ).date()
                             if filter_since < create_date:
                                 get_element = True
                         else:
@@ -646,27 +636,23 @@ class Request:
                             for feature in feature_list:
                                 try:
                                     if feature == "description":
-                                        desc = element.get(
-                                                "description")
+                                        desc = element.get("description")
                                         if desc:
-                                            description = str(
-                                                desc.encode(
-                                                    "utf-8"))
-                                            element_desc = {
-                                                "description": description}
-                                            element_dict[feature] = \
-                                                element_desc
+                                            description = str(desc.encode("utf-8"))
+                                            element_desc = {"description": description}
+                                            element_dict[feature] = element_desc
                                     else:
                                         value = element.get(feature)
                                         element_dict[feature] = value
                                 except AttributeError as att_error:
                                     error_msg = (
-                                        "Encountered Attribute Error" +
-                                        str(att_error) +
-                                        "At element " +
-                                        feature +
-                                        "\t" +
-                                        element)
+                                        "Encountered Attribute Error"
+                                        + str(att_error)
+                                        + "At element "
+                                        + feature
+                                        + "\t"
+                                        + element
+                                    )
                                     self.logger.error(error_msg)
                             element_list.append(element_dict)
                 elif results and isinstance(results, dict):
@@ -694,9 +680,9 @@ class Request:
         repositories = self.selected_repos_dict.items()
         for repo_num, (repo, data) in enumerate(repositories, start=1):
             if repo_num % 100 == 0:
-                self.logger.info("Getting repo Nr. %s of %s",
-                                 repo_num,
-                                 len(repositories))
+                self.logger.info(
+                    "Getting repo Nr. %s of %s", repo_num, len(repositories)
+                )
                 time.sleep(10)
             repo_name = data.get("name")
             repo_owner = data.get("owner")
@@ -716,43 +702,46 @@ class Request:
                     self.logger.debug("Getting url: %s", url)
                     response = self.session.get(url)
                     if response.status_code == 200:
-                        soup = bs4.BeautifulSoup(
-                            response.content, "html.parser")
+                        soup = bs4.BeautifulSoup(response.content, "html.parser")
                         dependents_box = soup.find("div", {"id": "dependents"})
                         if dependents_box:
                             class_string = (
-                                "select-menu.float-right.position-relative" +
-                                ".details-reset.details-overlay"
+                                "select-menu.float-right.position-relative"
+                                + ".details-reset.details-overlay"
                             )
                             if isinstance(dependents_box, bs4.element.Tag):
                                 menu = dependents_box.select(
-                                    "details",
-                                    {"class": class_string})
+                                    "details", {"class": class_string}
+                                )
                                 if menu:
                                     options = menu[0].find_all(
-                                        "div", {"class": "select-menu-list"})
+                                        "div", {"class": "select-menu-list"}
+                                    )
                                 break
                             else:
                                 self.logger.debug(
                                     "Wrong datatype, dependentes_box type: %s",
-                                    type(dependents_box))
+                                    type(dependents_box),
+                                )
                     elif response.status_code == 429:
                         time_to_wait = int(response.headers["Retry-After"])
                         self.logger.critical(
-                            "Too many requests, sleeping for %s seconds.",
-                            time_to_wait)
+                            "Too many requests, sleeping for %s seconds.", time_to_wait
+                        )
                         time.sleep(time_to_wait)
                         continue
                     else:
-                        self.logger.error(
-                            "Could not retrive response for url %s",
-                            url)
+                        self.logger.error("Could not retrive response for url %s", url)
                         continue
                 except HTTPError as hp_error:
-                    self.logger.error("""
+                    self.logger.error(
+                        """
                                       Error %s at try %s.
                                       Retry in 1 minute.
-                                      """, hp_error, run+1)
+                                      """,
+                        hp_error,
+                        run + 1,
+                    )
                     time.sleep(5)
                     continue
             self.logger.debug("Finished getting dependency box")
@@ -764,142 +753,140 @@ class Request:
                         time.sleep(1)
                         href = ""
                         href_string = re.search(
-                            r"href=\"(.+?)\"\s",  # Added r due to warning
-                            str(row))
+                            r"href=\"(.+?)\"\s", str(row)  # Added r due to warning
+                        )
                         if href_string:
                             href = href_string.group(1)
                         pattern = "dependents?"
-                        href_split = href.replace(
-                            pattern,
-                            f" {pattern} ").split(" ")
-                        href_url = (url_1 +
-                                    href_split[0] +
-                                    href_split[1] +
-                                    "dependent_type=REPOSITORY&" +
-                                    href_split[2])
+                        href_split = href.replace(pattern, f" {pattern} ").split(" ")
+                        href_url = (
+                            url_1
+                            + href_split[0]
+                            + href_split[1]
+                            + "dependent_type=REPOSITORY&"
+                            + href_split[2]
+                        )
                         self.logger.debug("href_url: %s", href_url)
-                        tmp_href_response = self.session.get(
-                                    href_url)
+                        tmp_href_response = self.session.get(href_url)
                         if tmp_href_response.status_code != 200:
                             if tmp_href_response == 429:
                                 time_to_wait = int(
-                                    tmp_href_response.headers["Retry-After"])
+                                    tmp_href_response.headers["Retry-After"]
+                                )
                                 self.logger.critical(
                                     "Too many requests, sleeping for %s sec.",
-                                    time_to_wait)
+                                    time_to_wait,
+                                )
                                 time.sleep(time_to_wait)
                                 continue
                             self.logger.debug(
-                                "Status code: %s",
-                                tmp_href_response.status_code)
+                                "Status code: %s", tmp_href_response.status_code
+                            )
                             self.logger.debug(
-                                "Response message: %s",
-                                tmp_href_response.json())
+                                "Response message: %s", tmp_href_response.json()
+                            )
                             time.sleep(60)
                             continue
                         tmp_href_soup = bs4.BeautifulSoup(
-                                    tmp_href_response.content,
-                                    "html.parser")
-                        box = tmp_href_soup.find(
-                                    "a", {"class": "btn-link selected"}
-                                    )
+                            tmp_href_response.content, "html.parser"
+                        )
+                        box = tmp_href_soup.find("a", {"class": "btn-link selected"})
                         box_text = ""
                         if box:
                             box_text = box.text
-                        dep_num = box_text.strip().split(
-                            " ")[0].replace(",", "")
+                        dep_num = box_text.strip().split(" ")[0].replace(",", "")
                         try:
                             total_dependents += int(dep_num)
                             break
                         except ValueError:
                             self.logger.error(
-                                "Could not add value %s from link %s",
-                                dep_num, href_url)
+                                "Could not add value %s from link %s", dep_num, href_url
+                            )
                             time.sleep(3)
                             continue
                     if dependents_details:
                         page_count = 0
                         next_exists = True
-                        while (next_exists
-                                and len(visible_dependents) <
-                                result_cnt):
-                            tmp_href_response = self.session.get(
-                                href_url)
+                        while next_exists and len(visible_dependents) < result_cnt:
+                            tmp_href_response = self.session.get(href_url)
                             if tmp_href_response.status_code != 200:
                                 if tmp_href_response == 429:
                                     time_to_wait = int(
-                                        tmp_href_response.headers[
-                                            "Retry-After"])
+                                        tmp_href_response.headers["Retry-After"]
+                                    )
                                     self.logger.critical(
                                         "Too many requests: sleeping %s sec",
-                                        time_to_wait)
+                                        time_to_wait,
+                                    )
                                     time.sleep(time_to_wait)
                                     continue
                                 else:
                                     self.logger.debug(
-                                        "Status code: %s",
-                                        tmp_href_response.status_code)
+                                        "Status code: %s", tmp_href_response.status_code
+                                    )
                                     self.logger.debug(
-                                        "Response message: %s",
-                                        tmp_href_response)
+                                        "Response message: %s", tmp_href_response
+                                    )
                                     time.sleep(60)
                                     continue
-                            self.logger.debug(
-                                        "Requesting page %s",
-                                        href_url)
+                            self.logger.debug("Requesting page %s", href_url)
                             tmp_href_soup = bs4.BeautifulSoup(
-                                tmp_href_response.content,
-                                "html.parser")
+                                tmp_href_response.content, "html.parser"
+                            )
                             page_count += 1
                             if page_count % 10 == 0:
                                 time.sleep(3)
                             try:
                                 dependents_box = tmp_href_soup.find(
-                                    "div", {"id": "dependents"})
+                                    "div", {"id": "dependents"}
+                                )
                                 if not dependents_box:
                                     break
                                 dependents = dependents_box.find(
-                                    "div", {"class": "Box"})
+                                    "div", {"class": "Box"}
+                                )
                                 dependents_elements = dependents.find_all(
                                     "div",
-                                    {"class":
-                                    "Box-row d-flex flex-items-center",
-                                    "data-test-id": "dg-repo-pkg-dependent"})
+                                    {
+                                        "class": "Box-row d-flex flex-items-center",
+                                        "data-test-id": "dg-repo-pkg-dependent",
+                                    },
+                                )
                                 if dependents_elements:
                                     for element in dependents_elements:
                                         cell = element.find(
-                                            "span",
-                                            {"class": "f5 color-fg-muted"})
+                                            "span", {"class": "f5 color-fg-muted"}
+                                        )
                                         try:
                                             user = cell.find(
-                                                "a",
-                                                {"data-hovercard-type": "user"}
-                                                ).text
+                                                "a", {"data-hovercard-type": "user"}
+                                            ).text
                                         except AttributeError:
                                             user = cell.find(
                                                 "a",
-                                                {"data-hovercard-type":
-                                                 "organization"}).text
+                                                {"data-hovercard-type": "organization"},
+                                            ).text
                                         repository = element.find(
                                             "a",
-                                            {"class":
-                                             "text-bold",
-                                             "data-hovercard-type":
-                                             "repository"}).text
-                                        visible_dependents.append(
-                                            [user, repository])
+                                            {
+                                                "class": "text-bold",
+                                                "data-hovercard-type": "repository",
+                                            },
+                                        ).text
+                                        visible_dependents.append([user, repository])
                                 else:
                                     break
                                 selector = []
                                 selector = dependents_box.find(
-                                    "div", {"class": "BtnGroup"})
+                                    "div", {"class": "BtnGroup"}
+                                )
                                 if selector:
                                     for u_elem in selector:
                                         if u_elem.text == "Next":
                                             next_exists = True
                                             href = re.search(
-                                                r'href=[\'"]?([^\'" >]+)',
-                                                str(u_elem))
+                                                r'href=[\'"]?([^\'" >]+)', str(u_elem)
+                                            )
                                             if href:
                                                 href_url = href.group(1)
                                                 page_count += 1
@@ -908,18 +895,16 @@ class Request:
                                                 next_exists = False
                                         else:
                                             next_exists = False
-                            except requests.exceptions.ConnectionError \
-                                    as conn_err:
+                            except requests.exceptions.ConnectionError as conn_err:
                                 self.logger.critical(
-                                    "ConnectionError: %s - Retry in 5 min.",
-                                    conn_err
+                                    "ConnectionError: %s - Retry in 5 min.", conn_err
                                 )
                                 time.sleep(300)
                                 continue
-            dependents_results[repo] = {"total_dependents":
-                                        total_dependents,
-                                        "visible_dependents":
-                                        len(visible_dependents)}
+            dependents_results[repo] = {
+                "total_dependents": total_dependents,
+                "visible_dependents": len(visible_dependents),
+            }
         return dependents_results
 
     def get_dependencies(self) -> Dict[int, int]:
@@ -933,19 +918,17 @@ class Request:
         repositories = self.selected_repos_dict.items()
         for repo_num, (repo, data) in enumerate(repositories, start=1):
             if repo_num % 100 == 0:
-                self.logger.info("Getting repo Nr. %s of %s",
-                                 repo_num,
-                                 len(repositories))
+                self.logger.info(
+                    "Getting repo Nr. %s of %s", repo_num, len(repositories)
+                )
             repo_name = data.get("name")
             repo_owner = data.get("owner")
             repo_owner_login = ""
             if repo_owner:
                 repo_owner_login = repo_owner.get("login")
             self.logger.info("Getting repository %s", repo)
-            url_1 = self.query_features.get(
-                "dependencies").get("request_url_1")
-            url_2 = self.query_features.get(
-                "dependencies").get("request_url_2")
+            url_1 = self.query_features.get("dependencies").get("request_url_1")
+            url_2 = self.query_features.get("dependencies").get("request_url_2")
             url = url_1 + str(repo_owner_login) + "/" + str(repo_name) + url_2
             self.logger.debug("Getting url: %s", url)
             next_exists = True
@@ -964,55 +947,59 @@ class Request:
                         response = self.session.get(url)
                         if response.status_code == 429:
                             time_to_wait = int(response.headers["Retry-After"])
-                            self.logger.critical("Too many requests, sleeping for %s seconds.",
-                                                 time_to_wait)
+                            self.logger.critical(
+                                "Too many requests, sleeping for %s seconds.",
+                                time_to_wait,
+                            )
                             time.sleep(time_to_wait)
                             continue
                         soup = bs4.BeautifulSoup(response.content, "html.parser")
-                        dependencies_box = soup.find(
-                            "div", {"id": "dependencies"})
+                        dependencies_box = soup.find("div", {"id": "dependencies"})
                         dependencies = dependencies_box.find(
-                            "div", {"class": "Box",
-                                    "data-view-component": "true"})
+                            "div", {"class": "Box", "data-view-component": "true"}
+                        )
                         if dependencies_box:
                             break
                         else:
-                            self.logger.error("""
+                            self.logger.error(
+                                """
                                             Could not find dependency
                                             box at %s try.
                                             Retry in 1 minute.
-                                            """, run + 1)
+                                            """,
+                                run + 1,
+                            )
                             time.sleep(3)
                             continue
                     except AttributeError:
                         self.logger.error(
                             "Attribute Error at repo_num %s, repo_id = %s",
-                            repo_num, repo)
+                            repo_num,
+                            repo,
+                        )
                         time.sleep(5)
                 if dependencies:
                     for element in dependencies.find_all(
-                        "li", {"class": "Box-row",
-                               "data-view-component": "true"}):
+                        "li", {"class": "Box-row", "data-view-component": "true"}
+                    ):
                         # time.sleep(1)
                         try:
                             text = element.find(
                                 "a", {"class": "h4 Link--primary no-underline"}
-                                ).text.strip()
+                            ).text.strip()
                         except AttributeError:
                             text = element.find(
                                 "div", {"class": "d-flex flex-items-baseline"}
-                                ).text.strip()
+                            ).text.strip()
                         results.add(text)
                 else:
-                    self.logger.debug("No dependencies for repo %s",
-                                      repo)
+                    self.logger.debug("No dependencies for repo %s", repo)
                     break
                 next_exists = False
                 try:
-                    paginate_cont = soup.find("div",
-                                              {"class": "paginate-container"})
+                    paginate_cont = soup.find("div", {"class": "paginate-container"})
                     if paginate_cont:
-                        for u in paginate_cont.find_all('a'):
+                        for u in paginate_cont.find_all("a"):
                             if u.text == "Next":
                                 next_exists = True
                                 url = url_1 + u["href"]
@@ -1026,19 +1013,41 @@ class Request:
                     next_exists = True
             dependency_results[repo] = sorted(results)
         return dependency_results
-    
+
     def get_branches(self, activity: str = "all") -> Dict[int, Dict[str, str]]:
         """
         Gets all branches from GitHub page instead of API.
         :return: Branch name and corresponding status
         """
+
+        def check(x):
+            try:
+                # return all(
+                #     [
+                #         "LoadingSkeleton"
+                #         not in line.find_elements(By.TAG_NAME, "td")[4].get_attribute(
+                #             "innerHTML"
+                #         )
+                #         for line in self.browser.find_element(
+                #             By.TAG_NAME, "tbody"
+                #         ).find_elements(By.TAG_NAME, "tr")
+                #     ]
+                # )
+                return "LoadingSkeleton" not in self.browser.find_element(
+                    By.TAG_NAME, "tbody"
+                ).get_attribute("innerHTML")
+            except NoSuchElementException:
+                return True
+
+        wait = WebDriverWait(self.browser, timeout=2, poll_frequency=0.2)
+
         branches_results = {}
         repositories = self.selected_repos_dict.items()
         for repo_num, (repo, data) in enumerate(repositories, start=1):
             if repo_num % 100 == 0:
-                self.logger.info("Getting repo Nr. %s of %s",
-                                 repo_num,
-                                 len(repositories))
+                self.logger.info(
+                    "Getting repo Nr. %s of %s", repo_num, len(repositories)
+                )
             repo_name = data.get("name")
 
             repo_owner = data.get("owner")
@@ -1046,103 +1055,85 @@ class Request:
             if repo_owner:
                 repo_owner_login = repo_owner.get("login")
             self.logger.info("Getting repository %s", repo)
-            url_1 = self.query_features.get(
-                "branches_web").get("request_url_1")
-            url_2 = self.query_features.get(
-                "branches_web").get("request_url_2")
-
-            url = (url_1 +
-                   str(repo_owner_login) +
-                   "/" +
-                   str(repo_name) +
-                   url_2 +
-                   ("/") +
-                   activity
-                   )
+            url_1 = self.query_features.get("branches_web").get("request_url_1")
+            url_2 = self.query_features.get("branches_web").get("request_url_2")
+            base_url = (
+                url_1
+                + str(repo_owner_login)
+                + "/"
+                + str(repo_name)
+                + url_2
+                + ("/")
+                + activity
+            )
+            url = base_url
             next_exists = True
             result_cnt = 500000
             results = {}
             while next_exists and len(results) < result_cnt:
-                response = self.session.get(url)
-                self.logger.debug("Getting url %s", url)
-                if response.status_code != 200:
-                    if response == 429:
-                        time_to_wait = int(
-                            response.headers["Retry-After"])
-                        self.logger.critical(
-                            "Too many requests, sleeping for %s seconds.",
-                            time_to_wait)
-                        time.sleep(time_to_wait)
-                        continue
-                    self.logger.debug(
-                        "Status code: %s",
-                        response.status_code)
-                    self.logger.debug(
-                        "Response message: %s",
-                        response.json())
-                    time.sleep(60)
-                    continue
+                self.browser.get(url)
+                wait.until(check)
+              
+                # response = self.session.get(url)
+                # self.logger.debug("Getting url %s", url)
+                # if response.status_code != 200:
+                #     if response == 429:
+                #         time_to_wait = int(response.headers["Retry-After"])
+                #         self.logger.critical(
+                #             "Too many requests, sleeping for %s seconds.", time_to_wait
+                #         )
+                #         time.sleep(time_to_wait)
+                #         continue
+                #     self.logger.debug("Status code: %s", response.status_code)
+                #     self.logger.debug("Response message: %s", response.json())
+                #     time.sleep(60)
+                #     continue
 
-                soup = bs4.BeautifulSoup(response.content, "html.parser")
-                all_branches = soup.find("div", {"data-target":
-                                                 "branch-filter.result"})
-                time.sleep(1)
-                if all_branches:
-                    for element in all_branches.find_all(
-                        "li",
-                        {"class": "Box-row position-relative"}):
-                        branch_name = ""
-                        branch_status = ""
-                        element = element.find("branch-filter-item")
-                        try:
-                            branch_name = element.select(
-                                'a[class*="branch-name"]')[0].text
-                            if element.select('span[class*="State State"]'):
-                                branch_status = element.select(
-                                    'span[class*="State State"]'
-                                    )[0].text.strip()
-                            elif element.select('a[class*="btn "]'):
-                                branch_status = element.select(
-                                    'a[class*="btn "]')[0].text.strip()
-                            else:
-                                branch_status = ""
-                        except AttributeError:
-                            self.logger.error(AttributeError)
-                        results[branch_name] = branch_status
+                soup = bs4.BeautifulSoup(self.browser.page_source, "html.parser")
+                for branch in soup.find("tbody").find_all("tr"):
+                    cells = branch.find_all("td")
+                    branch_name = cells[0].find("a").find("div").text
+                    branch_status = ""
+                    try:
+                        state = cells[4].find("div").find("div")["data-testid"]
+                        if state == "closed-pull-request-icon":
+                            branch_status = "Closed"
+                        elif state == "open-pull-request-icon":
+                            branch_status = "Open"
+                        elif state == "draft-pull-request-icon":
+                            branch_status = "Compare"
+                        elif state == "merged-pull-request-icon":
+                            branch_status = "Merged"
+
+                    except (AttributeError, TypeError) as e:
+                        # some branches do not have a related pull request
+                        self.logger.info("no branch status found")
+                    except KeyError as e:
+                        self.logger.error(e)
+                    results[branch_name] = branch_status
+
+                if elem := soup.select("a[rel=next]"):
+                    url = base_url + "?page=" + elem[0]["href"].replace("#", "")
                 else:
-                    break
-                next_exists = False
-                try:
-                    for u_elem in soup.find(
-                        "div", {"class": "paginate-container"}).find_all('a'):
-                        if u_elem.text == "Next":
-                            next_exists = True
-                            url = u_elem["href"]
-                except HTTPError as hp_error:
-                    self.logger.info(hp_error)
-                    time.sleep(1)
-                    next_exists = True
+                    next_exists = False
+              
             branches_results[repo] = results
             time.sleep(1)
         return branches_results
 
-    def get_context_information(self, main_feature: str,
-                                sub_feature: str, filters: Dict[str, Any]
-                                ) -> Dict[int, List[Dict[str, Any]]]:
+    def get_context_information(
+        self, main_feature: str, sub_feature: str, filters: Dict[str, Any]
+    ) -> Dict[int, List[Dict[str, Any]]]:
         """
         :param main_feature: Feature which concerns the main information.
         :param sub_feature: Feature which concerns the context information.
         :return: Dictionary with context information of main feature.
         """
         main_data = self.query_repository([main_feature], filters=filters)
-        request_url_1 = self.query_features.get(
-            sub_feature).get("request_url_1")
-        request_url_2 = self.query_features.get(
-            sub_feature).get("request_url_2")
-        feature_list = self.query_features.get(
-            sub_feature).get("feature_list")
-        feature_key = self.query_features.get(
-            sub_feature).get("feature_key")
+        request_url_1 = self.query_features.get(sub_feature).get("request_url_1")
+        request_url_2 = self.query_features.get(sub_feature).get("request_url_2")
+        feature_list = self.query_features.get(sub_feature).get("feature_list")
+        feature_key = self.query_features.get(sub_feature).get("feature_key")
         return_data = {}
         feature_data = main_data.get(main_feature)
         repositories = {}
@@ -1150,16 +1141,17 @@ class Request:
             repositories = feature_data.items()
         for repo_num, (repo, data) in enumerate(repositories, start=1):
             if repo_num % 100 == 0:
-                self.logger.info("Getting repo Nr. %s of %s",
-                                 repo_num,
-                                 len(repositories))
+                self.logger.info(
+                    "Getting repo Nr. %s of %s", repo_num, len(repositories)
+                )
             data_list = []
             for element in data:
                 element_dict = {}
                 key = element.get(feature_key)
                 element_url = request_url_1 + str(key) + request_url_2
                 result = self.session.get(
-                            element_url, headers=self.headers, timeout=100)
+                    element_url, headers=self.headers, timeout=100
+                )
                 sub_data = result.json()
                 for feature in feature_list:
                     if isinstance(sub_data, dict):
@@ -1177,7 +1169,7 @@ class Request:
         object_id: int,
         object_url: str,
         sub_url: str,
-        filter_date: Union[datetime, None]
+        filter_date: Union[datetime, None],
     ) -> Dict[int, List[Dict[str, Any]]]:
         """
         :param session: Active request session
@@ -1198,26 +1190,19 @@ class Request:
         self.logger.info("Getting page %s", start_url)
         response = requests.Response()
         for i in range(5):
-            response = self.session.get(start_url,
-                                        headers=self.headers,
-                                        timeout=100)
+            response = self.session.get(start_url, headers=self.headers, timeout=100)
             if response.status_code in [403, 429]:
                 self.check_rate_limit(response=response)
-            elif response.status_code in [400, 401,
-                                          404, 406, 410]:
-                self.logger.error(
-                    "Query object %s failed:%s",
-                    object_id, response)
+            elif response.status_code in [400, 401, 404, 406, 410]:
+                self.logger.error("Query object %s failed:%s", object_id, response)
                 time.sleep(3)
                 continue
-            elif response.status_code in [500, 502,
-                                          503, 504]:
+            elif response.status_code in [500, 502, 503, 504]:
                 self.logger.debug(
-                    "Connection failed at object %s:%s",
-                    object_id, response)
+                    "Connection failed at object %s:%s", object_id, response
+                )
                 self.logger.critical(
-                    "ConnectionError: %s - Retry in 5 min.",
-                    response.status_code
+                    "ConnectionError: %s - Retry in 5 min.", response.status_code
                 )
                 time.sleep(300)
                 continue
@@ -1226,31 +1211,26 @@ class Request:
                 break
 
         results = response.json()
-        if response.links.get('next'):
-            while response.links.get('next'):
+        if response.links.get("next"):
+            while response.links.get("next"):
                 try:
-                    url = response.links['next']['url']
-                    self.logger.debug("Search query: %s",
-                                      url)
-                    response = self.session.get(
-                        url,
-                        headers=self.headers)
+                    url = response.links["next"]["url"]
+                    self.logger.debug("Search query: %s", url)
+                    response = self.session.get(url, headers=self.headers)
                     if response.status_code in [403, 429]:
                         self.check_rate_limit(response=response)
-                    elif response.status_code in [400, 401,
-                                                  404, 406, 410]:
+                    elif response.status_code in [400, 401, 404, 406, 410]:
                         self.logger.error(
-                            "Query object %s failed:%s",
-                            object_id, response)
+                            "Query object %s failed:%s", object_id, response
+                        )
                         break
-                    elif response.status_code in [500, 502,
-                                                  503, 504]:
+                    elif response.status_code in [500, 502, 503, 504]:
                         self.logger.debug(
-                            "Connection failed at object %s:%s",
-                            object_id, response)
+                            "Connection failed at object %s:%s", object_id, response
+                        )
                         self.logger.critical(
                             "ConnectionError: %s - Retry in 5 min.",
-                            response.status_code
+                            response.status_code,
                         )
                         time.sleep(300)
                         continue
@@ -1259,10 +1239,9 @@ class Request:
                         results.extend(next_result)
                     elif isinstance(results, Dict):
                         results.update(next_result)
-                        
+
                 except HTTPError as hp_error:
-                    self.logger.error(
-                        "Error at querying all pages %s", hp_error)
+                    self.logger.error("Error at querying all pages %s", hp_error)
                     time.sleep(10)
 
         element_dict = {}  # type: dict[str, Any]
@@ -1274,8 +1253,8 @@ class Request:
                     created_at = element.get("created_at")
                     if filter_date and created_at:
                         created_at = datetime.strptime(
-                            element.get("created_at"),
-                            '%Y-%m-%dT%H:%M:%SZ')
+                            element.get("created_at"), "%Y-%m-%dT%H:%M:%SZ"
+                        )
                         if created_at > filter_date:
                             element_dict[feature] = element.get(feature)
                     else:
@@ -1287,9 +1266,7 @@ class Request:
             for feature in features:
                 created_at = results.get("created_at")
                 if filter_date and created_at:
-                    created_at = datetime.strptime(
-                        created_at,
-                        '%Y-%m-%dT%H:%M:%SZ')
+                    created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
                     if created_at > filter_date:
                         element_dict[feature] = results.get(feature)
                 else:
