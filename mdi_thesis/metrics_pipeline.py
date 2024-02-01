@@ -341,7 +341,7 @@ def main():
     Set start for pipeline filters
     """
 
-    start_date = date(2023, 8, 23)
+    start_date = date.today()
     run_pipeline(start_date=start_date)
 
 
