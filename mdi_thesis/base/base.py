@@ -23,7 +23,7 @@ from requests.packages.urllib3.util.retry import Retry
 import mdi_thesis.constants as constants
 import mdi_thesis.base.utils as utils
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
@@ -90,9 +90,9 @@ class Request:
         )
         self.filter_date = filter_date
 
-        options = FirefoxOptions()
-        options.add_argument("--headless")
-        self.browser = webdriver.Firefox(options=options)
+        options = ChromeOptions()
+        options.add_argument("--headless=new")
+        self.browser = webdriver.Chrome(options=options)
 
     def select_repos(
         self, repo_nr: int, repo_list: List[int], query_parameters: str = ""
