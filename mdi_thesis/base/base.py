@@ -92,6 +92,7 @@ class Request:
 
         options = ChromeOptions()
         options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
         self.browser = webdriver.Chrome(options=options)
 
     def select_repos(
@@ -1073,7 +1074,7 @@ class Request:
             while next_exists and len(results) < result_cnt:
                 self.browser.get(url)
                 wait.until(check)
-              
+
                 # response = self.session.get(url)
                 # self.logger.debug("Getting url %s", url)
                 # if response.status_code != 200:
@@ -1116,7 +1117,7 @@ class Request:
                     url = base_url + "?page=" + elem[0]["href"].replace("#", "")
                 else:
                     next_exists = False
-              
+
             branches_results[repo] = results
             time.sleep(1)
         return branches_results
