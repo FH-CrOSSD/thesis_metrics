@@ -1091,27 +1091,29 @@ class Request:
                 #     continue
 
                 soup = bs4.BeautifulSoup(self.browser.page_source, "html.parser")
-                for branch in soup.find("tbody").find_all("tr"):
-                    cells = branch.find_all("td")
-                    branch_name = cells[0].find("a").find("div").text
-                    branch_status = ""
-                    try:
-                        state = cells[4].find("div").find("div")["data-testid"]
-                        if state == "closed-pull-request-icon":
-                            branch_status = "Closed"
-                        elif state == "open-pull-request-icon":
-                            branch_status = "Open"
-                        elif state == "draft-pull-request-icon":
-                            branch_status = "Compare"
-                        elif state == "merged-pull-request-icon":
-                            branch_status = "Merged"
+                table = soup.find("tbody")
+                if table:
+                    for branch in table.find_all("tr"):
+                        cells = branch.find_all("td")
+                        branch_name = cells[0].find("a").find("div").text
+                        branch_status = ""
+                        try:
+                            state = cells[4].find("div").find("div")["data-testid"]
+                            if state == "closed-pull-request-icon":
+                                branch_status = "Closed"
+                            elif state == "open-pull-request-icon":
+                                branch_status = "Open"
+                            elif state == "draft-pull-request-icon":
+                                branch_status = "Compare"
+                            elif state == "merged-pull-request-icon":
+                                branch_status = "Merged"
 
-                    except (AttributeError, TypeError) as e:
-                        # some branches do not have a related pull request
-                        self.logger.info("no branch status found")
-                    except KeyError as e:
-                        self.logger.error(e)
-                    results[branch_name] = branch_status
+                        except (AttributeError, TypeError) as e:
+                            # some branches do not have a related pull request
+                            self.logger.info("no branch status found")
+                        except KeyError as e:
+                            self.logger.error(e)
+                        results[branch_name] = branch_status
 
                 if elem := soup.select("a[rel=next]"):
                     url = base_url + "?page=" + elem[0]["href"].replace("#", "")
