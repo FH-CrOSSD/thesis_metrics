@@ -92,7 +92,7 @@ class Request:
 
         options = ChromeOptions()
         options.add_argument("--headless=new")
-        options.add_argument("--no-sandbox")
+        # options.add_argument("--no-sandbox")
         self.browser = webdriver.Chrome(options=options)
 
     def select_repos(
