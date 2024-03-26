@@ -1282,3 +1282,4 @@ class Request:
 
     def __del__(self):
         self.session.close()
+        self.browser.quit()
