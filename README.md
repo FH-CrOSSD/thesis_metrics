@@ -6,6 +6,11 @@ We made some modifications to integrate it better into our own project and updat
 This repository is part of the [CrOSSD](https://health.crossd.tech/about) project and powers the `bak-rest-drone` component.  
 **See our main repository [here](https://github.com/FH-CrOSSD/crossd).**
 
+## Secrets
+
+For accessing the GitHub API, a API token needs to be provided.
+The code reads the `GH_TOKEN` environment variable, which can also be provided via `.env` file.
+
 ## Acknowledgements
 
 The financial support from Internetstiftung/Netidee is gratefully acknowledged. The mission of Netidee is to support development of open-source tools for more accessible and versatile use of the Internet in Austria.
@@ -44,9 +49,9 @@ The mdi_thesis folder contains the scripts for data collection and metrics calcu
 - `data_check.ipynb` - Used for a quick check the completeness of the data. For more details the date range included for each metric and the corresponding information is stored in a seperate file. 
 
 
-### Security
-Currently a GitHub token is required, to achieve this create a GitHub token and copy it into the constants_template.py file.
-Then rename the file to constants.py.
+### ~~Security~~
+~~Currently a GitHub token is required, to achieve this create a GitHub token and copy it into the constants_template.py file.
+Then rename the file to constants.py.~~
 
 ### Contributions
 
