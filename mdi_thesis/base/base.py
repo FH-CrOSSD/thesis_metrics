@@ -120,7 +120,7 @@ class Request:
                 retry_count = 0
                 while response.status_code != 200:
                     if retry_count >=5:
-                        self.logger.error("Skipping item %s after 5 retries!")
+                        self.logger.error("Skipping item %s after 5 retries!", item)
                         break
                     self.logger.error("Could not retrieve item %s", item)
                     self.logger.error(
