@@ -117,7 +117,11 @@ class Request:
                 url = f"https://api.github.com/repos/{item}"
                 self.logger.debug("URL = %s", url)
                 response = self.session.get(url, headers=self.headers, timeout=100)
+                retry_count = 0
                 while response.status_code != 200:
+                    if retry_count >=5:
+                        self.logger.error("Skipping item %s after 5 retries!")
+                        break
                     self.logger.error("Could not retrieve item %s", item)
                     self.logger.error(
                         "Message: %s - %s", response.status_code, response.json()
@@ -127,6 +131,7 @@ class Request:
                     else:
                         self.check_rate_limit(response=response)
                     response = self.session.get(url, headers=self.headers, timeout=100)
+                    retry_count += 1
                 results = response.json()
                 while "next" in response.links.keys():
                     res = self.session.get(
