@@ -122,7 +122,7 @@ class Request:
                     self.logger.error(
                         "Message: %s - %s", response.status_code, response.json()
                     )
-                    if response.status_code == 404:
+                    if response.status_code in (404, 451):
                         break
                     else:
                         self.check_rate_limit(response=response)
